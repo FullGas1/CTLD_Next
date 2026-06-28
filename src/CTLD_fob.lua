@@ -518,7 +518,7 @@ end
 function CTLDFOBManager:buildMenuSection(playerObj, menu)
     local root   = ctld.tr("CTLD")
     local fobSub = ctld.tr("FOBs List")
-    menu:addSubMenu({ root }, fobSub, { order = 60 })
+    menu:addSubMenu({ root }, fobSub, { order = 55 })
 
     menu:addCommand({ root, fobSub }, ctld.tr("List active FOBs"),
         function(arg)

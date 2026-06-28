@@ -5,7 +5,6 @@
 > **Divergences majeures connues** :
 > - Les zones troupes ont migré de `PKZ_/EXZ_` vers `TRZ_` (voir [TroopZones_Architecture.md](TroopZones_Architecture.md))
 > - `CTLDZone` générique a été splitté : `CTLDTroopZone` (TRZ) + `CTLDLogisticZone` (LGZ)
-> - Section 4.6 décrit l'ancienne convention PKZ/EXZ/WPZ — conserver comme référence historique
 
 ---
 
@@ -474,9 +473,9 @@ classDiagram
 
 ---
 
-### 4.6 CTLDZone / CTLDZoneManager
+### 4.6 CTLDTroopZone / CTLDLogisticZone / CTLDZoneManager
 
-**Responsabilité** : `CTLDZone` représente une zone DCS (pickup, dropoff, waypoint, extract, logistic). `CTLDZoneManager` charge les zones AI depuis la config à l'init et découvre les zones humain par parsing des noms DCS.
+**Responsabilité** : `CTLDTroopZone` représente une zone DCS de type troupe (pickup, extract, waypoint). `CTLDLogisticZone` représente une zone logistique (crates, véhicules). `CTLDZoneManager` singleton charge et découvre les zones humain par parsing des noms DCS et les zones AI depuis la config.
 
 > **Décision EVO-09** : les pickupZones gèrent **uniquement les troupes**. Le chargement de véhicules depuis une pickupZone est supprimé (voir EVO-09 en section 7).
 > **Feature S** : les zones AI (AIZ) sont déclarées par config (`cfg.settings["aiZones"]`), sans convention de nommage DCS. Voir §4.4 du missionmaker guide.
@@ -539,64 +538,101 @@ Si zéro erreur et zéro warning : `"CTLDZoneManager: zone config valid"` loggé
 
 ---
 
-#### Convention de nommage des zones humain (EVO-10)
+#### Convention de nommage des zones humain
 
 Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 
-| Préfixe | Type | Schéma de nommage |
-|---|---|---|
-| `PKZ` | pickupZone (troupes) | `PKZ_name_[R/B/N]` |
-| `WPZ` | wpZone (waypoint) | `WPZ_name_[R/B/N]` |
-| `EXZ` | extractZone | `EXZ_name` |
-| `LGZ` | logisticZone | `LGZ_name_[R/B/N]` |
+| Préfixe | Classe | Schéma | Description |
+|---|---|---|---|
+| `TRZ` | `CTLDTroopZone` | `TRZ_<name>_<A/R/B/N>_<stock>_<flag>_<target>` | TroopZone — pickup troops + extract objectif (remplace PKZ + EXZ) |
+| `WPZ` | `CTLDTroopZone` | `WPZ_<name>_[R/B/N]` | WaypointZone — les troupes déployées marchent vers le centre |
+| `LGZ` | `CTLDLogisticZone` | `LGZ_<name>_[R/B/N]` | LogisticZone — point de demande de caisses / véhicules |
 
-**Zones polygonales :** détectées par présence de `verticies` dans `env.mission.triggers.zones`.
+> Référence complète du schéma TRZ (champs, validations, exemples) : [TroopZones_Architecture.md](TroopZones_Architecture.md)
+
+**Compatibilité legacy** : `_loadLegacyZones()` reconnaît encore les préfixes `PKZ_`, `EXZ_`, `IAZ_` pour les missions non migrées — **déprécié, ne pas utiliser dans les nouvelles missions**.
+
+**Zones polygonales** : détectées par présence de `verticies` dans `env.mission.triggers.zones`.
 - Circulaire → `isInZone(point)` : `distance(point, center) ≤ radius`
-- Polygonale → `isInZone(point)` : ray casting sur `verticies`
+- Polygonale → `isInZone(point)` : ray casting sur `verticies` (CTLDTroopZone uniquement — LGZ toujours circulaire)
 
 ---
 
-**Propriétés CTLDZone** :
+**Propriétés CTLDTroopZone** :
 
 | Propriété | Type | Description |
 |---|---|---|
-| `zoneName` | `string` | Paramètre `name` extrait du nom DCS |
 | `dcsName` | `string` | Nom DCS complet de la trigger zone |
-| `coalition` | `number` | Coalition (`side`) |
+| `zoneName` | `string` | Champ `name` extrait du nom DCS |
+| `coalition` | `number` | 0=all, 1=RED, 2=BLUE |
 | `center` | `vec3` | Centre de la zone |
 | `radius` | `number` | Rayon (zones circulaires) |
 | `verticies` | `table\|nil` | Sommets (zones polygonales) |
-| `zoneType` | `string` | `"pickup"` `"drop"` `"waypoint"` `"extract"` `"logistic"` `"ai_pickup"` `"ai_drop"` |
+| `pickMaxStock` | `number\|nil` | `nil`=pas de pickup ; `0`=illimité ; `N`=limité |
+| `pickCurrentStock` | `number` | Stock restant |
+| `objectiveFlag` | `string\|nil` | Nom du flag DCS incrémenté à l'extraction |
+| `objectiveTarget` | `number\|nil` | Seuil de soldats pour l'objectif (`nil`=aucun) |
+| `isWaypoint` | `bool` | `true` si WPZ — troupes marchent vers le centre |
+| `isDropoff` | `bool` | Zone de dépôt IAZ legacy |
+| `isAIPickup` / `isAIDropoff` | `bool` | Pickup/dropoff IA exclusif (Feature S) |
+| `aiDropMode` | `string` | `"G"` `"P"` `"GP"` — mode déploiement IA dropoff |
+| `smoke` | `number` | Couleur fumée (`trigger.smokeColor.*` ou `-1`) |
 | `active` | `bool` | Zone active ou désactivée |
-| `smoke` | `number` | Couleur fumée (-1 = aucune) |
-| `limit` | `number` | Limite de groupes (PKZ uniquement, -1 = illimité) |
-| `flagName` | `string\|nil` | Flag DCS auto (EXZ uniquement) = `NAME_FLG` |
-| `cargoType` | `string\|nil` | Type cargaison AIZ pickup (`"T"`, `"V"`, `"TV"`) |
-| `troopStock` | `number\|nil` | Stock de soldats AIZ pickup (-1 = illimité) |
-| `aiDropMode` | `string\|nil` | Mode déploiement AIZ dropoff (`"G"`, `"P"`, `"GP"`) |
 
-**Méthodes CTLDZone** :
+**Méthodes CTLDTroopZone** :
 
 | Signature | Description |
 |---|---|
-| `CTLDZone:new(data)` | Constructeur |
-| `CTLDZone:isInZone(point)` | Circulaire ou ray casting polygonal selon type |
-| `CTLDZone:getCenter()` | Retourne vec3 centre |
-| `CTLDZone:activate()` / `CTLDZone:deactivate()` | Active/désactive |
+| `CTLDTroopZone:hasPickup()` | `true` si `pickMaxStock ~= nil` |
+| `CTLDTroopZone:hasExtract()` | `true` si `objectiveFlag ~= nil` |
+| `CTLDTroopZone:hasWaypoint()` | `true` si `isWaypoint == true` (WPZ) |
+| `CTLDTroopZone:hasDropoff()` | `true` si `isDropoff == true` (IAZ legacy) |
+| `CTLDTroopZone:isInZone(point)` | Circulaire ou ray casting polygonal |
+| `CTLDTroopZone:activate()` / `:deactivate()` | Active/désactive |
 
-**Méthodes CTLDZoneManager** :
+**Propriétés CTLDLogisticZone** :
+
+| Propriété | Type | Description |
+|---|---|---|
+| `name` | `string` | Nom de la zone (champ `name` extrait du nom DCS) |
+| `coalition` | `number` | 0=all, 1=RED, 2=BLUE |
+| `radius` | `number` | Rayon (toujours circulaire, défaut 200 m) |
+| `services` | `table` | `{ cratesPickup, cratesDropoff, vehicleSpawn }` (bool par service) |
+| `active` | `bool` | Zone active |
+
+`services` : permet de désactiver sélectivement des fonctions d'une LGZ (ex : LGZ sans spawn de véhicules).
+
+**Méthodes CTLDLogisticZone** :
+
+| Signature | Description |
+|---|---|
+| `CTLDLogisticZone:getCenter()` | Centre actuel (dynamique si `_linkedUnit`) |
+| `CTLDLogisticZone:isInZone(point)` | Distance ≤ radius |
+| `CTLDLogisticZone:isDynamic()` | `true` si zone suit une unité DCS |
+| `CTLDLogisticZone:isAlive()` | `true` si unité liée existe encore |
+| `CTLDLogisticZone:activate()` / `:deactivate()` | Active/désactive |
+
+**Méthodes CTLDZoneManager (sélection)** :
 
 | Signature | Description |
 |---|---|
 | `CTLDZoneManager.getInstance()` | Singleton |
-| `CTLDZoneManager:_loadAIZonesFromConfig()` | Charge les AIZ depuis `cfg.settings["aiZones"]` (Feature S) |
+| `CTLDZoneManager:init()` | Découverte des zones DCS + chargement legacy + AIZ config |
+| `CTLDZoneManager:getTroopZone(zoneName)` | TRZ par zoneName |
+| `CTLDZoneManager:getTroopZonesForCoalition(coalition)` | Toutes les TRZ pour une coalition |
+| `CTLDZoneManager:getTroopZoneAtPoint(point, coalition)` | TRZ au point donné |
+| `CTLDZoneManager:getTroopZoneForUnit(unitName)` | TRZ où se trouve l'unité |
+| `CTLDZoneManager:getWaypointZoneAt(point, coalition)` | WPZ au point donné |
+| `CTLDZoneManager:getLogisticZone(name)` | LGZ par nom |
+| `CTLDZoneManager:getLogisticZonesForCoalition(coalition)` | Toutes les LGZ pour une coalition |
+| `CTLDZoneManager:getLogisticZoneAtPoint(point, coalition)` | LGZ au point donné |
+| `CTLDZoneManager:getLogisticZoneForUnit(unitName)` | LGZ où se trouve l'unité |
+| `CTLDZoneManager:registerFOBAsLogistic(fobName, point, radius, coalitionId)` | Enregistre une FOB comme LGZ dynamique |
+| `CTLDZoneManager:unregisterLogistic(name)` | Supprime une LGZ dynamique |
+| `CTLDZoneManager:setTroopZoneActive(zoneName, active)` | Active/désactive une TRZ |
+| `CTLDZoneManager:isUnitInZone(unitName, zoneType)` | Retourne la zone où se trouve l'unité |
+| `CTLDZoneManager:changeRemainingGroups(zoneName, amount)` | Incrémente/décrémente le stock TRZ |
 | `CTLDZoneManager:_validateZoneNames()` | Rapport d'erreurs/warnings AIZ au démarrage (i18n) |
-| `CTLDZoneManager:discoverZones()` | Scan `env.mission.triggers.zones` + parsing + instanciation |
-| `CTLDZoneManager:getZonesForCoalition(coalition, type)` | Zones filtrées par coalition et type |
-| `CTLDZoneManager:getZoneByName(name, type)` | Zone par `zoneName` et type |
-| `CTLDZoneManager:getNearestZone(point, coalition, type)` | Zone la plus proche |
-| `CTLDZoneManager:isUnitInZone(unitName, type)` | Retourne la zone où se trouve l'unité, ou nil |
-| `CTLDZoneManager:updateZoneCounter(zoneName, diff)` | Incrémente/décrémente le compteur PKZ |
 
 **Dépendances** : CTLDConfig, CTLDUtils
 

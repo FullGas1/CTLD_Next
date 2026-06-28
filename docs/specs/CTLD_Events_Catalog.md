@@ -1,7 +1,7 @@
 # CTLD Events Catalog
 
 **Status**: Current — extracted from `src/` 2026-06-29
-**Total events**: 49 CTLD application events + 13 DCS engine event types handled
+**Total events**: 51 CTLD application events + 13 DCS engine event types handled
 
 ---
 
@@ -465,7 +465,12 @@ Fired when a JTAC is spawned (vehicle or static).
 | `jtac.isFlying` | bool | `true` for drone JTACs |
 | `jtac.isInfantry` | bool | |
 | `jtac.route` | table or nil | Drone patrol route |
-| `jtac.laserCode` | number | Static JTAC only |
+| `spawner` | string | Player unit name or `"MissionMaker"` |
+| `laserCode` | number | Assigned laser code (0 if none) |
+| `smokeEnabled` | bool | |
+| `smokeColor` | string or nil | |
+| `lockMode` | string | JTAC lock mode setting |
+| `radio` | table or nil | Radio config `{ freq, modulation }` |
 | `timestamp` | number | |
 
 **Publisher**: `CTLDJTACManager:spawnJTAC()`, `:spawnJTACStatic()`
@@ -500,8 +505,15 @@ Fired when a JTAC acquires a target and begins lasing.
 | `target.unitType` | string | |
 | `target.coalition` | number | |
 | `target.position` | vec3 | |
-| `target.distance` | number | Metres from JTAC |
-| `target.heading` | number | Degrees |
+| `target.priority` | number | Target priority score |
+| `target.selectionMethod` | string | `"auto_nearest"` or `"manual"` |
+| `target.wasManuallySelected` | bool | |
+| `laserCode` | number | |
+| `lockMode` | string | JTAC lock mode |
+| `distance` | number | Metres from JTAC to target |
+| `lineOfSight` | bool | LOS confirmed at time of lock |
+| `radio` | table or nil | Radio config |
+| `message` | string or nil | Status message shown to player |
 | `timestamp` | number | |
 
 **Publisher**: `CTLDJTACManager:_tick()` (lasing loop, on acquisition)
@@ -593,7 +605,41 @@ Fired when a JTAC is destroyed in combat.
 
 ---
 
-### RECON Events (7)
+### RECON Events (9)
+
+#### `ReconFarpDetected`
+
+Fired when a player in RECON detects an enemy FARP or FOB.
+
+> Note: uses non-standard naming (no `On` prefix) — matches source at `CTLD_recon.lua:493`.
+
+| Field | Type | Description |
+|---|---|---|
+| `player` | string | Player name |
+| `playerUnit` | Unit | DCS Unit object |
+| `coalition` | number | Enemy coalition ID |
+| `playerCoalition` | number | Player's coalition ID |
+| `position` | vec3 | FARP/FOB position |
+| `id` | string | Internal mark ID (used by `ReconFarpLost`) |
+
+**Publisher**: `CTLDReconManager` (FARP/FOB layer detection logic)
+
+---
+
+#### `ReconFarpLost`
+
+Fired when a previously detected enemy FARP/FOB leaves the RECON scan radius or is destroyed.
+
+> Note: uses non-standard naming (no `On` prefix) — matches source at `CTLD_recon.lua:487`.
+
+| Field | Type | Description |
+|---|---|---|
+| `player` | string | Player name |
+| `id` | string | Internal mark ID matching the `ReconFarpDetected` event |
+
+**Publisher**: `CTLDReconManager` (FARP/FOB layer cleanup callback)
+
+---
 
 #### `OnReconScan`
 Fired when a player performs a RECON scan.
@@ -706,7 +752,8 @@ Fired when a FOB is fully assembled and deployed.
 | `totalCratesUsed` | number | |
 | `position` | vec3 | |
 | `sceneObjects` | table | DCS StaticObjects spawned |
-| `logisticZone` | table | Created logistics zone `{ name, radius, ... }` |
+| `logisticZone` | table | Created LGZ `{ name, radius, type="static" }` |
+| `player` | string | Player unit name who triggered deployment |
 | `timestamp` | number | |
 
 **Publisher**: `CTLDFOBManager:deployFOBCrates()` (after full build)
@@ -726,7 +773,10 @@ Fired when a FOB's integrity drops below the destruction threshold.
 | `destruction.killerCoalition` | number or nil | |
 | `destruction.objectsDestroyed` | number | |
 | `destruction.objectsTotal` | number | |
-| `destruction.integrityPercent` | number | 0.0–1.0 |
+| `destruction.destructionThreshold` | number | Config `fobDestructionThreshold` (default 0.5) |
+| `destruction.integrityPercent` | number | 0.0–1.0 at time of event |
+| `logisticZone` | table | `{ name, wasActive=true }` |
+| `durationAlive` | number | Seconds from deployment to destruction |
 | `timestamp` | number | |
 
 **Publisher**: `CTLDFOBManager:onDead()` (S_EVENT_DEAD handler)

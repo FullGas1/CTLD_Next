@@ -5,7 +5,8 @@
 # CTLD_Next.lua is intentionally tracked — available at repo root for DCS missions.
 # Do NOT add it to .gitignore.
 
-# ── Local-only recette resources (never commit) ───────────────────────────────
-# All local debug/diagnostic/patch scripts live in recette/local/.
-# New files created there are automatically excluded from git.
-recette/local/
+# ── Local-only recette scratch files (never commit) ──────────────────────────
+# recette/local/ no longer exists in the repo.
+# Diagnostic probes are in recette/dev/diag/ (tracked).
+# If you create personal scratch scripts, put them here and they will be ignored:
+recette/scratch/

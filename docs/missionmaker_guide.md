@@ -400,7 +400,7 @@ Overrides are applied at startup on top of the built-in dictionaries. You can ov
 
 1. Create `src/CTLD_i18n_XX.lua` following the English file as a template.
 2. Add `CTLD_i18n_XX.lua` to `merger_V2/listToMerge.txt` (after the other dict files).
-3. Rerun `merger_V2/generate_loader.cmd` to update the dev loader.
+3. Rerun `powershell -ExecutionPolicy Bypass -File tools/merger_V2/generate_loader.ps1` to update the dev loader.
 4. Activate the new language in `CTLD_i18n.lua`.
 5. Run `merger_V2/generate_i18n_dicts.ps1` to check for missing keys.
 
@@ -1469,7 +1469,7 @@ LGZ (spawn) → load (hover or menu) → fly → unload → unpack → vehicle /
 ```
 
 > **Transport flows reference diagram** — for a complete visual overview of all equipment transport modes (crates, whole vehicles, JTAC lifecycle) with per-method status indicators:
-> [docs/assets/transport_flows.svg](assets/transport_flows.svg)
+> [docs/assets/equiptTransportFlows.svg](assets/equiptTransportFlows.svg)
 
 ### 10.2 Actions
 
@@ -1541,7 +1541,7 @@ CTLDCrateManager.getInstance():unloadCrate(crateName, position, "menu")
 
 CTLD supports two vehicle operations: **requesting** a vehicle at a logistics zone (spawns it from a crate remotely) and **packing** an existing ground vehicle back into crates for transport.
 
-> See also: [Transport flows diagram](assets/transport_flows.svg) — all load/unload methods for whole-vehicle transport (Flow 2) including GAP-1/GAP-2 status.
+> See also: [Transport flows diagram](assets/equiptTransportFlows.svg) — all load/unload methods for whole-vehicle transport (Flow 2) including GAP-1/GAP-2 status.
 
 ### 11.2 Actions
 

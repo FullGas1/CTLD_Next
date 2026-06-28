@@ -17,7 +17,7 @@
 
 ## Gestion de session
 
-- **Début de session** : toujours récupérer et afficher le contexte mémorisé (mémoire projet, état des tâches, prochaine étape) avant toute autre action. Si la session implique de la recette Witchcraft, lire `docs/witchcraft-workflow.md` pour avoir le protocole complet en contexte.
+- **Début de session** : toujours récupérer et afficher le contexte mémorisé (mémoire projet, état des tâches, prochaine étape) avant toute autre action. Si la session implique de la recette Witchcraft, lire `.claude/witchcraft-workflow.md` pour avoir le protocole complet en contexte.
 - **Fin de session** : lorsque l'utilisateur annonce l'arrêt des travaux, mettre à jour **obligatoirement** toutes les mémoires impactées et confirmer la sauvegarde avant de clore.
 
 ## Règles de travail générales
@@ -35,7 +35,7 @@
 
 ## Exécution Lua en temps réel via Witchcraft
 
-> Référence complète : `docs/witchcraft-workflow.md`
+> Référence complète : `.claude/witchcraft-workflow.md`
 
 - **Witchcraft** : bridge Node.js/sockets pour injecter des scripts Lua dans une mission DCS active.
 - **Commande** : `node "C:\Users\Moi\.vscode-dcs-tools\bridge.js" "<chemin_absolu_script.lua>"`

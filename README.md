@@ -1121,7 +1121,7 @@ See [`docs/dev-guide.md`](docs/dev-guide.md) for:
 - Architecture overview (singleton managers, EventDispatcher)
 - How to add a new module
 - Event pub/sub patterns
-- Build instructions (local `merger.cmd`, CI via GitHub Actions)
+- Build instructions (local `merge_CTLD.ps1`, CI via GitHub Actions)
 - Unit testing with busted (no DCS required)
 - Full v1 → v2 migration guide
 
@@ -1129,7 +1129,7 @@ See [`docs/dev-guide.md`](docs/dev-guide.md) for:
 
 ```
 cd tools/merger_V2
-./merger.cmd
+powershell -ExecutionPolicy Bypass -File tools/merger_V2/merge_CTLD.ps1
 ```
 Output: `CTLD_Next.lua` at repo root.
 

@@ -42,23 +42,27 @@ CTLD (root, order=10)
 ├── Request Equipment               (submenu, order=25)
 ├── Vehicle Commands                (submenu, order=30)
 ├── Crate Commands                  (submenu, order=40)
-├── FOB                             (submenu, order=50)
-├── Radio Beacons                   (submenu, order=60)
+├── FOB (List active FOBs)          (submenu, order=60)  ← conflicts with Radio Beacons
+├── Radio Beacons                   (submenu, order=60)  ← conflicts with FOB
 ├── RECON                           (submenu, order=70)
+├── Mine Field                      (submenu, order=75)  ← conditional, sol only
 ├── Smoke                           (submenu, order=80)
 └── JTAC                            (submenu, order=90)
 ```
 
-DCS render order (F-key order):
+> **order=60 conflict**: Both FOB (`CTLD_fob.lua:521`) and Radio Beacons (`CTLD_beacon.lua`) use `order=60`. DCS render order between them depends on manager init sequence. This is a known gap — one should be renumbered (e.g. FOB → order=55).
+
+DCS render order (F-key order, approximate):
 ```
 F1 - Troop Commands
 F2 - Request Equipment
 F3 - Vehicle Commands
 F4 - Crate Commands
-F5 - FOB
-F6 - Radio Beacons
+F5 - FOB / Radio Beacons (order=60, sequence depends on init)
+F6 - Radio Beacons / FOB
 F7 - RECON
-F8 - Smoke
+F8 - Mine Field (conditional — only shown when mine fields nearby on ground)
+F9 - Smoke
 F9 - JTAC
 ```
 
@@ -73,11 +77,14 @@ F9 - JTAC
 | Request Equipment | CTLDCrateManager | 25 | — | `cratesEnabled=true` |
 | Crate Commands | CTLDCrateManager | 40 | — | `cratesEnabled=true` |
 | Vehicle Commands | CTLDVehicleSpawner | 30 | — | `canCarryVehicles=true` |
-| FOB | CTLDFOBManager | 50 | — | (internal) |
-| Radio Beacons | CTLDBeaconManager | 60 | `enabledRadioBeaconDrop` | `isTransport=true` |
+| FOB (List FOBs) | CTLDFOBManager | **60** ⚠️ | `enabledFOBBuilding` | — |
+| Radio Beacons | CTLDBeaconManager | **60** ⚠️ | `enabledRadioBeaconDrop` | `isTransport=true` |
 | RECON | CTLDReconManager | 70 | `reconF10Menu` | — |
+| Mine Field | mineFieldScene | 75 | — | SOL + mine fields nearby |
 | Smoke | CTLDCrateManager | 80 | `enableSmokeDrop` | `isTransport=true` |
 | JTAC | CTLDJTACManager | 90 | `JTAC_jtacStatusF10` | — |
+
+⚠️ Both FOB and Radio Beacons use order=60. Render order between them is init-sequence dependent.
 
 All sections registered via `CTLDPlayerManager:registerMenuSection()`.
 
@@ -280,6 +287,22 @@ RECON
 
 ---
 
+## Mine Field (order=75)
+
+**Manager**: `mineFieldScene` (scene plugin)
+**File**: `src/scenes/CTLD_mineFieldScene.lua`
+**Condition**: player on ground AND mine fields within `demineRadius` (default 150m)
+
+```
+Mine Field
+├── Clear Mine Field (N mines, ~Xm)    [one entry per nearby mine set]
+└── [...]
+```
+
+This section is registered via `CTLDPlayerManager.deferMenuSection()` and refreshed on land/takeoff and after each clearing operation. Hidden entirely if no mine fields are nearby.
+
+---
+
 ## Smoke (order=80)
 
 **Manager**: `CTLDCrateManager`
@@ -288,8 +311,14 @@ RECON
 
 ```
 Smoke
-└── [Smoke color options per config]
+├── Drop Red Smoke
+├── Drop Blue Smoke
+├── Drop Orange Smoke
+├── Drop Green Smoke
+└── Smoke Auto-Resume [activate] / [deactivate]   (toggle command)
 ```
+
+`Smoke Auto-Resume`: if activated, smoke markers are automatically re-dropped after burning out.
 
 ---
 
