@@ -119,7 +119,10 @@ zone.dcsName         = "TRZ_fob_N_30_defend_50"  -- full DCS zone name
 zone.zoneName        = "fob"                       -- name field
 
 -- Coalition
-zone.coalition       = coalition.side.NEUTRAL      -- 0=all, 1=RED, 2=BLUE, 3=NEUTRAL
+-- Internal value: A→0 (all), R→1, B→2, N→coalition.side.NEUTRAL (0 in DCS)
+-- Note: A and N both store 0 internally. In CTLD, 0 = "accept all coalitions".
+-- In DCS multiplayer, NEUTRAL (0) players do not exist, so A and N behave identically.
+zone.coalition       = 0  -- 0=all/neutral, 1=RED, 2=BLUE
 
 -- Stock management (pickup)
 zone.pickMaxStock    = 30        -- nil = no pickup; 0 = unlimited

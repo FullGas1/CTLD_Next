@@ -1,8 +1,7 @@
-# Feature Q — Vehicle whole-unit air transport (spec)
+# Vehicle Whole-Unit Air Transport
 
-> **Status** : implémentée [2026-05-19]
-> **Branch** : `feature_modularisation_and_Config`
-> **Fichiers impactés** : `src/CTLD_vehicle.lua`, `src/CTLD_crate.lua`
+> **Status** : implemented [2026-05-19] — verified against code [2026-06-28]
+> **Files** : `src/CTLD_vehicle.lua`, `src/CTLD_crate.lua`
 
 ---
 
@@ -32,18 +31,20 @@ Un CTLDVehicle en état `WAITING` peut provenir de trois sources :
 
 **Nouvel ordre d'affichage :**
 
-| Order addSubMenu | Menu | Manager |
+| Order | Menu | Manager |
 | --- | --- | --- |
 | 20 | Troop Commands | CTLDTroopManager |
 | 25 | Request Equipment | CTLDCrateManager |
 | 30 | Vehicle Commands | CTLDVehicleSpawner |
 | 40 | Crate Commands | CTLDCrateManager |
+| 60 | Radio Beacons | CTLDBeaconManager |
+| 70 | RECON | CTLDReconManager |
 | 80 | Smoke | CTLDCrateManager |
 | 90 | JTAC Commands | CTLDJTACManager |
 
-**Motivation** : Request Equipment couvre désormais caisses ET véhicules entiers. Il doit précéder Vehicle Commands (le joueur commande d'abord, puis charge).
+**Motivation** : Request Equipment covers both crates AND whole vehicles. It must precede Vehicle Commands (player requests first, then loads).
 
-**Site** : `CTLD_crate.lua` — `buildMenuSection` ligne `menu:addSubMenu({ root }, spawnSub, { order = 40 })` → `order = 25`.
+**Site** : `CTLD_crate.lua` — `refreshRequestEquipmentSection` → `menu:addSubMenu({ root }, spawnSub, { order = 25 })`.
 
 ---
 

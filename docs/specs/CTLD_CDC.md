@@ -1,8 +1,11 @@
 # CTLD — Cahier de Conception Détaillée
 
-> **Langue** : Document rédigé en français. Une version anglaise sera produite en fin de projet.
-> **Version** : 0.1 — branche `feature_modularisation_and_Config`
-> **Date** : 2026-03-20
+> **Langue** : Document rédigé en français.
+> **Version** : 0.1 (initial 2026-03-20) — révisé 2026-06-28 : noms de classes corrigés contre code final
+> **Divergences majeures connues** :
+> - Les zones troupes ont migré de `PKZ_/EXZ_` vers `TRZ_` (voir [TroopZones_Architecture.md](TroopZones_Architecture.md))
+> - `CTLDZone` générique a été splitté : `CTLDTroopZone` (TRZ) + `CTLDLogisticZone` (LGZ)
+> - Section 4.6 décrit l'ancienne convention PKZ/EXZ/WPZ — conserver comme référence historique
 
 ---
 
@@ -30,7 +33,7 @@ Migrer CTLD vers une architecture orientée objet (OOP) en Lua 5.1, dans les con
 
 - **Isofonctionnel** : reproduire exactement toutes les fonctionnalités existantes
 - **Modularité** : chaque domaine fonctionnel dans une classe dédiée
-- **Maintenabilité** : CTLDCore < 500 lignes, chaque classe < 800 lignes
+- **Maintenabilité** : CTLDCoreManager < 500 lignes, chaque classe < 800 lignes
 - **Nouvelles features** : Scenes/FOB via CTLDSceneManager, menu Unpack dynamique, renommage pack→pack
 - **Build reproductible** : fusion des modules `src/` → `CTLD.lua`
 
@@ -40,11 +43,11 @@ Migrer CTLD vers une architecture orientée objet (OOP) en Lua 5.1, dans les con
 |---|---|---|
 | Transport de troupes | ✅ | CTLDTroopManager |
 | Transport de caisses | ✅ | CTLDCrateManager |
-| Transport de véhicules | ✅ | CTLDVehicleManager |
+| Transport de véhicules | ✅ | CTLDVehicleSpawner |
 | FOB | ✅ | CTLDFOBManager + CTLDSceneManager |
-| Systèmes AA multi-caisses | ✅ | CTLDAASystemManager + CTLDSceneManager |
-| JTAC | ✅ | CTLDJtacManager |
-| RECON | ✅ | CTLDRecon |
+| Systèmes AA multi-caisses | ✅ | CTLDCrateAssemblyManager + CTLDSceneManager |
+| JTAC | ✅ | CTLDJTACManager |
+| RECON | ✅ | CTLDReconManager |
 | Balises radio | ✅ | CTLDBeaconManager |
 | Scènes DCS | ✅ | CTLDSceneManager (nouvelle) |
 | Menus F10 | ✅ | Distribués dans chaque classe fonctionnelle |
@@ -67,23 +70,23 @@ Migrer CTLD vers une architecture orientée objet (OOP) en Lua 5.1, dans les con
 ### 2.2 Hiérarchie de dépendances
 
 ```
-CTLDCore
+CTLDCoreManager
   ├── CTLDConfig          (zéro dépendance)
   ├── CTLDi18n            (zéro dépendance)
   ├── CTLDUtils           (dépend de CTLDConfig)
-  ├── MenuManager         (dépend de CTLDi18n)
+  ├── ctld.MenuManager         (dépend de CTLDi18n)
   ├── CTLDObjectsDescDb   (zéro dépendance)
   ├── CTLDSceneManager    (dépend de CTLDObjectsDescDb, CTLDUtils)
   ├── CTLDZoneManager     (dépend de CTLDUtils, CTLDConfig)
-  ├── CTLDTroopManager    (dépend de CTLDZoneManager, CTLDUtils, MenuManager)
-  ├── CTLDCrateManager    (dépend de CTLDZoneManager, CTLDSceneManager, CTLDUtils, MenuManager)
-  ├── CTLDVehicleManager  (dépend de CTLDZoneManager, CTLDUtils, MenuManager)
+  ├── CTLDTroopManager    (dépend de CTLDZoneManager, CTLDUtils, ctld.MenuManager)
+  ├── CTLDCrateManager    (dépend de CTLDZoneManager, CTLDSceneManager, CTLDUtils, ctld.MenuManager)
+  ├── CTLDVehicleSpawner  (dépend de CTLDZoneManager, CTLDUtils, ctld.MenuManager)
   ├── CTLDFOBManager      (dépend de CTLDSceneManager, CTLDBeaconManager, CTLDUtils)
-  ├── CTLDAASystemManager (dépend de CTLDSceneManager, CTLDUtils, CTLDConfig)
-  ├── CTLDBeaconManager   (dépend de CTLDUtils, CTLDConfig, MenuManager)
-  ├── CTLDRecon           (dépend de CTLDUtils, CTLDConfig, MenuManager)
-  ├── CTLDJtacManager     (dépend de CTLDUtils, CTLDConfig, MenuManager)
-  └── CTLDPlayerManager   (dépend de tous les managers fonctionnels, MenuManager)
+  ├── CTLDCrateAssemblyManager (dépend de CTLDSceneManager, CTLDUtils, CTLDConfig)
+  ├── CTLDBeaconManager   (dépend de CTLDUtils, CTLDConfig, ctld.MenuManager)
+  ├── CTLDReconManager           (dépend de CTLDUtils, CTLDConfig, ctld.MenuManager)
+  ├── CTLDJTACManager     (dépend de CTLDUtils, CTLDConfig, ctld.MenuManager)
+  └── CTLDPlayerManager   (dépend de tous les managers fonctionnels, ctld.MenuManager)
 ```
 
 ### 2.3 Diagramme de classes
@@ -92,8 +95,8 @@ CTLDCore
 classDiagram
     direction TB
 
-    class CTLDCore {
-        +getInstance() CTLDCore
+    class CTLDCoreManager {
+        +getInstance() CTLDCoreManager
         +init()
         +onPlayerEnterUnit(event)
         +onPlayerLeaveUnit(event)
@@ -117,8 +120,8 @@ classDiagram
         +getUnitsInRadius(point, radius, coalition) table
         +getStaticsInRadius(point, radius) table
     }
-    class MenuManager {
-        +getInstance() MenuManager
+    class ctld.MenuManager {
+        +getInstance() ctld.MenuManager
         +getOrCreateRootMenu(groupId, label) Menu
         +removeGroupMenus(groupId)
         +addSubMenu(parent, label, groupId) Menu
@@ -130,7 +133,7 @@ classDiagram
         +register(key, descFunc)
         +has(key) bool
     }
-    class CtldZone {
+    class CTLDZone {
         +name string
         +coalition number
         +point vec3
@@ -141,11 +144,11 @@ classDiagram
     class CTLDZoneManager {
         +getInstance() CTLDZoneManager
         +loadZonesFromConfig()
-        +getZonesForCoalition(coalition) CtldZone[]
-        +getNearestZone(point, coalition, type) CtldZone
-        +isUnitInZone(unitName) CtldZone
+        +getZonesForCoalition(coalition) CTLDZone[]
+        +getNearestZone(point, coalition, type) CTLDZone
+        +isUnitInZone(unitName) CTLDZone
     }
-    class CtldTroop {
+    class CTLDTroopGroup {
         +groupName string
         +coalition number
         +size number
@@ -154,13 +157,13 @@ classDiagram
     }
     class CTLDTroopManager {
         +getInstance() CTLDTroopManager
-        +getLoadableGroups(coalition, limit) CtldTroop[]
+        +getLoadableGroups(coalition, limit) CTLDTroopGroup[]
         +loadTroopsFromZone(unitName, groupName)
         +unloadExtractTroops(unitName)
         +checkTroopStatus(unitName)
         +buildMenu(player, parentMenu)
     }
-    class CtldCrate {
+    class CTLDCrate {
         +id number
         +desc string
         +unit string
@@ -176,13 +179,13 @@ classDiagram
         +loadNearbyCrate(unitName)
         +dropSlingCrate(unitName)
         +unpackCrate(unitName, crateWeight)
-        +getNearbyUnpackableCrates(unitName) CtldCrate[]
+        +getNearbyUnpackableCrates(unitName) CTLDCrate[]
         +listNearbyCrates(unitName)
         +buildMenu(player, parentMenu)
         +buildUnpackSubMenu(player, parentMenu)
         +buildCommandsMenu(player, parentMenu)
     }
-    class CtldVehicle {
+    class CTLDVehicle {
         +groupName string
         +coalition number
         +typeName string
@@ -190,11 +193,11 @@ classDiagram
         +carrierUnit string
         +isPacked bool
     }
-    class CTLDVehicleManager {
-        +getInstance() CTLDVehicleManager
+    class CTLDVehicleSpawner {
+        +getInstance() CTLDVehicleSpawner
         +loadVehiclesFromZone(unitName)
         +unloadVehicles(unitName)
-        +getPackableVehicles(unitName) CtldVehicle[]
+        +getPackableVehicles(unitName) CTLDVehicle[]
         +packVehicleRequest(unitName, vehicleName)
         +loadUnloadFOBCrate(unitName)
         +buildMenu(player, parentMenu)
@@ -223,7 +226,7 @@ classDiagram
         +isSceneModel(name) bool
         +playScene(triggerUnit, sceneModel)
     }
-    class CtldBeacon {
+    class CTLDBeacon {
         +id number
         +coalition number
         +position vec3
@@ -240,30 +243,30 @@ classDiagram
         +createFOBBeacon(point, name, coalition)
         +buildMenu(player, parentMenu)
     }
-    class CTLDRecon {
-        +getInstance() CTLDRecon
+    class CTLDReconManager {
+        +getInstance() CTLDReconManager
         +showTargetsInLOS(unitName)
         +hideTargetsInLOS(unitName)
         +startAutoRefresh(unitName)
         +stopAutoRefresh(unitName)
         +buildMenu(coalitionId)
     }
-    class CtldJtac {
+    class CTLDJTAC {
         +groupName string
         +coalition number
         +currentTarget string
         +targetsList table
         +specialOptions table
     }
-    class CTLDJtacManager {
-        +getInstance() CTLDJtacManager
+    class CTLDJTACManager {
+        +getInstance() CTLDJTACManager
         +getJTACStatus(unitName)
         +setJTACTarget(groupName, target)
         +addJTACRadioCommand(groupName)
         +refreshMenus()
         +buildMenu(coalitionId)
     }
-    class CtldPlayer {
+    class CTLDPlayer {
         +unitName string
         +groupId number
         +coalition number
@@ -278,12 +281,12 @@ classDiagram
         +getInstance() CTLDPlayerManager
         +onPlayerEnterUnit(unitName)
         +onPlayerLeaveUnit(unitName)
-        +getPlayer(unitName) CtldPlayer
+        +getPlayer(unitName) CTLDPlayer
         +buildMenu(player)
         +refreshMenus()
     }
-    class CTLDAASystemManager {
-        +getInstance() CTLDAASystemManager
+    class CTLDCrateAssemblyManager {
+        +getInstance() CTLDCrateAssemblyManager
         +getSystemForCrate(crateUnit) table
         +tryAssemble(unitName, nearbyCrates)
         +tryRearm(unitName, nearestCrate, nearbyCrates, template)
@@ -294,31 +297,31 @@ classDiagram
         +unregisterSystem(groupName)
     }
 
-    CTLDCore --> CTLDConfig
-    CTLDCore --> CTLDi18n
-    CTLDCore --> CTLDUtils
-    CTLDCore --> CTLDPlayerManager
-    CTLDCore --> CTLDJtacManager
-    CTLDCore --> CTLDRecon
+    CTLDCoreManager --> CTLDConfig
+    CTLDCoreManager --> CTLDi18n
+    CTLDCoreManager --> CTLDUtils
+    CTLDCoreManager --> CTLDPlayerManager
+    CTLDCoreManager --> CTLDJTACManager
+    CTLDCoreManager --> CTLDReconManager
     CTLDPlayerManager --> CTLDTroopManager
     CTLDPlayerManager --> CTLDCrateManager
-    CTLDPlayerManager --> CTLDVehicleManager
+    CTLDPlayerManager --> CTLDVehicleSpawner
     CTLDPlayerManager --> CTLDFOBManager
     CTLDPlayerManager --> CTLDBeaconManager
-    CTLDPlayerManager --> CtldPlayer
+    CTLDPlayerManager --> CTLDPlayer
     CTLDFOBManager --> CTLDSceneManager
     CTLDFOBManager --> CTLDBeaconManager
     CTLDCrateManager --> CTLDSceneManager
-    CTLDCrateManager --> CTLDAASystemManager
-    CTLDCrateManager --> CtldCrate
-    CTLDAASystemManager --> CTLDSceneManager
-    CTLDVehicleManager --> CtldVehicle
+    CTLDCrateManager --> CTLDCrateAssemblyManager
+    CTLDCrateManager --> CTLDCrate
+    CTLDCrateAssemblyManager --> CTLDSceneManager
+    CTLDVehicleSpawner --> CTLDVehicle
     CTLDSceneManager --> CTLDObjectsDescDb
     CTLDSceneManager --> CtldScene
-    CTLDZoneManager --> CtldZone
-    CTLDTroopManager --> CtldTroop
-    CTLDBeaconManager --> CtldBeacon
-    CTLDJtacManager --> CtldJtac
+    CTLDZoneManager --> CTLDZone
+    CTLDTroopManager --> CTLDTroopGroup
+    CTLDBeaconManager --> CTLDBeacon
+    CTLDJTACManager --> CTLDJTAC
 ```
 
 ---
@@ -421,22 +424,22 @@ classDiagram
 
 ---
 
-### 4.4 MenuManager / Menu
+### 4.4 ctld.MenuManager / Menu
 
-**Responsabilité** : Gestion des menus F10 DCS. `Menu` représente un nœud de menu. `MenuManager` est le singleton gérant le cycle de vie des menus par groupe.
+**Responsabilité** : Gestion des menus F10 DCS. `Menu` représente un nœud de menu. `ctld.MenuManager` est le singleton gérant le cycle de vie des menus par groupe.
 
 **Fichier cible** : `src/CTLD_menu.lua`
 **Statut** : ✅ Existant — copie simple depuis `source/CTLD_menu.lua`
 
-**Méthodes MenuManager** :
+**Méthodes ctld.MenuManager** :
 
 | Signature | Description |
 |---|---|
-| `MenuManager.getInstance()` | Singleton |
-| `MenuManager:getOrCreateRootMenu(groupId, label)` | Retourne ou crée le sous-menu racine CTLD pour le groupe |
-| `MenuManager:removeGroupMenus(groupId)` | Supprime tous les menus F10 du groupe |
-| `MenuManager:addSubMenu(parent, label, groupId)` | Ajoute un sous-menu |
-| `MenuManager:addCommand(parent, label, groupId, callback, ...)` | Ajoute une commande |
+| `ctld.MenuManager.getInstance()` | Singleton |
+| `ctld.MenuManager:getOrCreateRootMenu(groupId, label)` | Retourne ou crée le sous-menu racine CTLD pour le groupe |
+| `ctld.MenuManager:removeGroupMenus(groupId)` | Supprime tous les menus F10 du groupe |
+| `ctld.MenuManager:addSubMenu(parent, label, groupId)` | Ajoute un sous-menu |
+| `ctld.MenuManager:addCommand(parent, label, groupId, callback, ...)` | Ajoute une commande |
 
 **Dépendances** : CTLDi18n
 
@@ -471,9 +474,9 @@ classDiagram
 
 ---
 
-### 4.6 CtldZone / CTLDZoneManager
+### 4.6 CTLDZone / CTLDZoneManager
 
-**Responsabilité** : `CtldZone` représente une zone DCS (pickup, dropoff, waypoint, extract, logistic). `CTLDZoneManager` charge les zones AI depuis la config à l'init et découvre les zones humain par parsing des noms DCS.
+**Responsabilité** : `CTLDZone` représente une zone DCS (pickup, dropoff, waypoint, extract, logistic). `CTLDZoneManager` charge les zones AI depuis la config à l'init et découvre les zones humain par parsing des noms DCS.
 
 > **Décision EVO-09** : les pickupZones gèrent **uniquement les troupes**. Le chargement de véhicules depuis une pickupZone est supprimé (voir EVO-09 en section 7).
 > **Feature S** : les zones AI (AIZ) sont déclarées par config (`cfg.settings["aiZones"]`), sans convention de nommage DCS. Voir §4.4 du missionmaker guide.
@@ -553,7 +556,7 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 
 ---
 
-**Propriétés CtldZone** :
+**Propriétés CTLDZone** :
 
 | Propriété | Type | Description |
 |---|---|---|
@@ -572,14 +575,14 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 | `troopStock` | `number\|nil` | Stock de soldats AIZ pickup (-1 = illimité) |
 | `aiDropMode` | `string\|nil` | Mode déploiement AIZ dropoff (`"G"`, `"P"`, `"GP"`) |
 
-**Méthodes CtldZone** :
+**Méthodes CTLDZone** :
 
 | Signature | Description |
 |---|---|
-| `CtldZone:new(data)` | Constructeur |
-| `CtldZone:isInZone(point)` | Circulaire ou ray casting polygonal selon type |
-| `CtldZone:getCenter()` | Retourne vec3 centre |
-| `CtldZone:activate()` / `CtldZone:deactivate()` | Active/désactive |
+| `CTLDZone:new(data)` | Constructeur |
+| `CTLDZone:isInZone(point)` | Circulaire ou ray casting polygonal selon type |
+| `CTLDZone:getCenter()` | Retourne vec3 centre |
+| `CTLDZone:activate()` / `CTLDZone:deactivate()` | Active/désactive |
 
 **Méthodes CTLDZoneManager** :
 
@@ -599,14 +602,14 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 
 ---
 
-### 4.7 CtldTroop / CTLDTroopManager
+### 4.7 CTLDTroopGroup / CTLDTroopManager
 
-**Responsabilité** : Gestion du transport de troupes. `CtldTroop` représente un groupe de troupes. `CTLDTroopManager` orchestre chargement, déchargement, extraction et construit le bloc de menu "Troop Transport".
+**Responsabilité** : Gestion du transport de troupes. `CTLDTroopGroup` représente un groupe de troupes. `CTLDTroopManager` orchestre chargement, déchargement, extraction et construit le bloc de menu "Troop Transport".
 
 **Fichier cible** : `src/CTLD_troop.lua`
 **Statut** : 🆕 À créer (migration depuis `source/CTLD_core.lua`)
 
-**Propriétés CtldTroop** :
+**Propriétés CTLDTroopGroup** :
 
 | Propriété | Type | Description |
 |---|---|---|
@@ -628,18 +631,18 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 | `CTLDTroopManager:checkTroopStatus(unitName)` | Affiche le statut du cargo de troupes |
 | `CTLDTroopManager:buildMenu(player, parentMenu)` | Construit "Troop Transport" [PAG: 9/p] |
 
-**Dépendances** : CTLDZoneManager, CTLDUtils, CTLDConfig, MenuManager
+**Dépendances** : CTLDZoneManager, CTLDUtils, CTLDConfig, ctld.MenuManager
 
 ---
 
-### 4.8 CtldCrate / CTLDCrateManager
+### 4.8 CTLDCrate / CTLDCrateManager
 
 **Responsabilité** : Gestion du cycle de vie des caisses logistiques (spawn, chargement sling, dépose, déballage). L'unpack applique une logique de dispatch par priorité : scène DCS, système AA, ou spawn classique.
 
 **Fichier cible** : `src/CTLD_crate.lua`
 **Statut** : 🆕 À créer (migration depuis `source/CTLD_core.lua`)
 
-**Propriétés CtldCrate** :
+**Propriétés CTLDCrate** :
 
 | Propriété | Type | Description |
 |---|---|---|
@@ -671,18 +674,18 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 | `CTLDCrateManager:buildUnpackSubMenu(player, parentMenu)` | Construit "Unpack Any Crate" — sous-menu dynamique contextuel [PAG: 10/p] |
 | `CTLDCrateManager:buildCommandsMenu(player, parentMenu)` | Construit "CTLD Commands" (Load/Drop/Unpack/List/FOBs) |
 
-**Dépendances** : CTLDZoneManager, CTLDSceneManager, CTLDUtils, CTLDConfig, MenuManager
+**Dépendances** : CTLDZoneManager, CTLDSceneManager, CTLDUtils, CTLDConfig, ctld.MenuManager
 
 ---
 
-### 4.9 CtldVehicle / CTLDVehicleManager
+### 4.9 CTLDVehicle / CTLDVehicleSpawner
 
 **Responsabilité** : Gestion du transport de véhicules et de la fonctionnalité pack (empaquetage d'un véhicule en caisse transportable). Contrainte `unitCanCarryVehicles` obligatoire pour afficher le bloc de menu.
 
 **Fichier cible** : `src/CTLD_vehicle.lua`
 **Statut** : 🆕 À créer (migration depuis `source/CTLD_core.lua`)
 
-**Propriétés CtldVehicle** :
+**Propriétés CTLDVehicle** :
 
 | Propriété | Type | Description |
 |---|---|---|
@@ -693,21 +696,21 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 | `carrierUnit` | `string\|nil` | Unité porteuse |
 | `isPacked` | `bool` | Converti en caisse transportable |
 
-**Méthodes CTLDVehicleManager** :
+**Méthodes CTLDVehicleSpawner** :
 
 | Signature | Description |
 |---|---|
-| `CTLDVehicleManager.getInstance()` | Singleton |
-| `CTLDVehicleManager:loadVehiclesFromZone(unitName)` | Charge des véhicules depuis une zone |
-| `CTLDVehicleManager:unloadVehicles(unitName)` | Décharge les véhicules |
-| `CTLDVehicleManager:getPackableVehicles(unitName)` | Véhicules packables dans le rayon `maximumDistancePackableUnitsSearch` |
-| `CTLDVehicleManager:packVehicleRequest(unitName, vehicleName)` | Empaquète un véhicule en caisse |
-| `CTLDVehicleManager:loadUnloadFOBCrate(unitName)` | Charge/dépose une caisse FOB |
-| `CTLDVehicleManager:buildMenu(player, parentMenu)` | Construit "Vehicle/FOB Transport" + sous-menu "Pack Vehicles" [PAG: 10/p] |
+| `CTLDVehicleSpawner.getInstance()` | Singleton |
+| `CTLDVehicleSpawner:loadVehiclesFromZone(unitName)` | Charge des véhicules depuis une zone |
+| `CTLDVehicleSpawner:unloadVehicles(unitName)` | Décharge les véhicules |
+| `CTLDVehicleSpawner:getPackableVehicles(unitName)` | Véhicules packables dans le rayon `maximumDistancePackableUnitsSearch` |
+| `CTLDVehicleSpawner:packVehicleRequest(unitName, vehicleName)` | Empaquète un véhicule en caisse |
+| `CTLDVehicleSpawner:loadUnloadFOBCrate(unitName)` | Charge/dépose une caisse FOB |
+| `CTLDVehicleSpawner:buildMenu(player, parentMenu)` | Construit "Vehicle/FOB Transport" + sous-menu "Pack Vehicles" [PAG: 10/p] |
 
 > Config renommée : `enablePackingVehicles` (ex-`enablePackingVehicles`), `maximumDistancePackableUnitsSearch` (ex-`maximumDistancePackableUnitsSearch`).
 
-**Dépendances** : CTLDZoneManager, CTLDUtils, CTLDConfig, MenuManager
+**Dépendances** : CTLDZoneManager, CTLDUtils, CTLDConfig, ctld.MenuManager
 
 ---
 
@@ -878,14 +881,14 @@ end,
 
 ---
 
-### 4.12 CtldBeacon / CTLDBeaconManager
+### 4.12 CTLDBeacon / CTLDBeaconManager
 
 **Responsabilité** : Gestion des balises radio (TACAN/ADF) déposées par les joueurs ou créées automatiquement lors du spawn d'un FOB.
 
 **Fichier cible** : `src/CTLD_beacon.lua`
 **Statut** : 🔄 Migration depuis `source/CTLD_beacon.lua`
 
-**Propriétés CtldBeacon** :
+**Propriétés CTLDBeacon** :
 
 | Propriété | Type | Description |
 |---|---|---|
@@ -909,11 +912,11 @@ end,
 | `CTLDBeaconManager:createFOBBeacon(point, name, coalition)` | Crée une balise statique pour un FOB |
 | `CTLDBeaconManager:buildMenu(player, parentMenu)` | Construit "Radio Beacons" (transport) ou "List Radio Beacons" (non-transport) |
 
-**Dépendances** : CTLDUtils, CTLDConfig, MenuManager
+**Dépendances** : CTLDUtils, CTLDConfig, ctld.MenuManager
 
 ---
 
-### 4.13 CTLDRecon
+### 4.13 CTLDReconManager
 
 **Responsabilité** : Singleton gérant la fonctionnalité RECON — affichage des cibles ennemies en ligne de visée (LOS) sur la carte F10, avec option auto-refresh.
 
@@ -924,25 +927,25 @@ end,
 
 | Signature | Description |
 |---|---|
-| `CTLDRecon.getInstance()` | Singleton |
-| `CTLDRecon:showTargetsInLOS(unitName)` | Affiche les cibles en LOS sur la carte F10 |
-| `CTLDRecon:hideTargetsInLOS(unitName)` | Masque les marqueurs de cibles |
-| `CTLDRecon:startAutoRefresh(unitName)` | Active le rafraîchissement automatique |
-| `CTLDRecon:stopAutoRefresh(unitName)` | Désactive le rafraîchissement automatique |
-| `CTLDRecon:buildMenu(coalitionId)` | Construit le bloc RECON [COND: reconF10Menu == true] |
+| `CTLDReconManager.getInstance()` | Singleton |
+| `CTLDReconManager:showTargetsInLOS(unitName)` | Affiche les cibles en LOS sur la carte F10 |
+| `CTLDReconManager:hideTargetsInLOS(unitName)` | Masque les marqueurs de cibles |
+| `CTLDReconManager:startAutoRefresh(unitName)` | Active le rafraîchissement automatique |
+| `CTLDReconManager:stopAutoRefresh(unitName)` | Désactive le rafraîchissement automatique |
+| `CTLDReconManager:buildMenu(coalitionId)` | Construit le bloc RECON [COND: reconF10Menu == true] |
 
-**Dépendances** : CTLDUtils, CTLDConfig, MenuManager
+**Dépendances** : CTLDUtils, CTLDConfig, ctld.MenuManager
 
 ---
 
-### 4.14 CtldJtac / CTLDJtacManager
+### 4.14 CTLDJTAC / CTLDJTACManager
 
 **Responsabilité** : Gestion des JTAC — désignation laser de cibles, options spéciales, menu de sélection de cibles. Polling toutes les 10 secondes pour mise à jour des menus.
 
 **Fichier cible** : `src/CTLD_jtac.lua`
 **Statut** : 🔄 Migration depuis `source/CTLD_jtac.lua`
 
-**Propriétés CtldJtac** :
+**Propriétés CTLDJTAC** :
 
 | Propriété | Type | Description |
 |---|---|---|
@@ -953,29 +956,29 @@ end,
 | `specialOptions` | `table` | Options spéciales avec `globalToggle` |
 | `menuId` | `number\|nil` | ID du menu F10 créé pour ce JTAC |
 
-**Méthodes CTLDJtacManager** :
+**Méthodes CTLDJTACManager** :
 
 | Signature | Description |
 |---|---|
-| `CTLDJtacManager.getInstance()` | Singleton |
-| `CTLDJtacManager:getJTACStatus(unitName)` | Affiche le statut de tous les JTACs |
-| `CTLDJtacManager:setJTACTarget(groupName, target)` | Définit la cible du JTAC |
-| `CTLDJtacManager:addJTACRadioCommand(groupName)` | Crée le menu F10 pour un JTAC |
-| `CTLDJtacManager:refreshMenus()` | Rafraîchit les menus JTAC (appelé par le polling 10s) |
-| `CTLDJtacManager:buildMenu(coalitionId)` | Construit le bloc JTAC complet [PAG: 9 groupes/p] |
+| `CTLDJTACManager.getInstance()` | Singleton |
+| `CTLDJTACManager:getJTACStatus(unitName)` | Affiche le statut de tous les JTACs |
+| `CTLDJTACManager:setJTACTarget(groupName, target)` | Définit la cible du JTAC |
+| `CTLDJTACManager:addJTACRadioCommand(groupName)` | Crée le menu F10 pour un JTAC |
+| `CTLDJTACManager:refreshMenus()` | Rafraîchit les menus JTAC (appelé par le polling 10s) |
+| `CTLDJTACManager:buildMenu(coalitionId)` | Construit le bloc JTAC complet [PAG: 9 groupes/p] |
 
-**Dépendances** : CTLDUtils, CTLDConfig, MenuManager
+**Dépendances** : CTLDUtils, CTLDConfig, ctld.MenuManager
 
 ---
 
-### 4.15 CtldPlayer / CTLDPlayerManager
+### 4.15 CTLDPlayer / CTLDPlayerManager
 
-**Responsabilité** : Orchestration principale côté joueur. `CtldPlayer` représente l'état d'un joueur en jeu. `CTLDPlayerManager` détecte les entrées/sorties d'unité, détermine les capacités de l'appareil et délègue la construction des menus.
+**Responsabilité** : Orchestration principale côté joueur. `CTLDPlayer` représente l'état d'un joueur en jeu. `CTLDPlayerManager` détecte les entrées/sorties d'unité, détermine les capacités de l'appareil et délègue la construction des menus.
 
 **Fichier cible** : `src/CTLD_player.lua`
 **Statut** : 🆕 À créer (extraction depuis `source/CTLD_core.lua`)
 
-**Propriétés CtldPlayer** :
+**Propriétés CTLDPlayer** :
 
 | Propriété | Type | Description |
 |---|---|---|
@@ -985,18 +988,18 @@ end,
 | `typeName` | `string` | Type DCS de l'appareil |
 | `isTransport` | `bool` | L'appareil est dans `ctld.unitActions` |
 | `canCarryVehicles` | `bool` | `unitCanCarryVehicles[typeName] == true` |
-| `loadedTroops` | `CtldTroop[]` | Troupes actuellement chargées |
-| `loadedCrates` | `CtldCrate[]` | Caisses actuellement chargées |
-| `loadedVehicles` | `CtldVehicle[]` | Véhicules actuellement chargés |
+| `loadedTroops` | `CTLDTroopGroup[]` | Troupes actuellement chargées |
+| `loadedCrates` | `CTLDCrate[]` | Caisses actuellement chargées |
+| `loadedVehicles` | `CTLDVehicle[]` | Véhicules actuellement chargés |
 
 **Méthodes CTLDPlayerManager** :
 
 | Signature | Description |
 |---|---|
 | `CTLDPlayerManager.getInstance()` | Singleton |
-| `CTLDPlayerManager:onPlayerEnterUnit(unitName)` | Crée le `CtldPlayer`, construit les menus F10 |
+| `CTLDPlayerManager:onPlayerEnterUnit(unitName)` | Crée le `CTLDPlayer`, construit les menus F10 |
 | `CTLDPlayerManager:onPlayerLeaveUnit(unitName)` | Nettoie le joueur et ses menus |
-| `CTLDPlayerManager:getPlayer(unitName)` | Retourne le `CtldPlayer` ou nil |
+| `CTLDPlayerManager:getPlayer(unitName)` | Retourne le `CTLDPlayer` ou nil |
 | `CTLDPlayerManager:buildMenu(player)` | Construit le menu racine CTLD + "Check Cargo" + délègue aux managers |
 | `CTLDPlayerManager:refreshMenus()` | Rafraîchit tous les menus actifs |
 
@@ -1007,7 +1010,7 @@ buildMenu(player)
         ├─ addCommand("Check Cargo")
         ├─ if player.isTransport:
         │   ├─ CTLDTroopManager:buildMenu()           [COND: unitActions.troops]
-        │   ├─ CTLDVehicleManager:buildMenu()         [COND: troops ET canCarryVehicles]
+        │   ├─ CTLDVehicleSpawner:buildMenu()         [COND: troops ET canCarryVehicles]
         │   ├─ CTLDCrateManager:buildMenu()           [COND: enableCrates ET crates ET NOT canCarryVehicles]
         │   ├─ CTLDCrateManager:buildCommandsMenu()   [COND: FOB OU crates]
         │   ├─ Smoke submenu                          [COND: enableSmokeDrop]
@@ -1016,7 +1019,7 @@ buildMenu(player)
             └─ addCommand("List Radio Beacons")
 ```
 
-**Dépendances** : CTLDTroopManager, CTLDCrateManager, CTLDVehicleManager, CTLDFOBManager, CTLDBeaconManager, MenuManager
+**Dépendances** : CTLDTroopManager, CTLDCrateManager, CTLDVehicleSpawner, CTLDFOBManager, CTLDBeaconManager, ctld.MenuManager
 
 ---
 
@@ -1043,7 +1046,7 @@ init()
   1.  CTLDConfig:init()
   2.  CTLDi18n:init()
   3.  CTLDUtils:init()
-  4.  MenuManager:init()
+  4.  ctld.MenuManager:init()
   5.  CTLDObjectsDescDb:init()
   6.  CTLDSceneManager:init()                -- enregistre FARP Alpha, mineField, FOB
   7.  CTLDZoneManager:discoverZones()        -- PKZ/WPZ/EXZ/LGZ depuis nommage DCS
@@ -1051,11 +1054,11 @@ init()
   9.  CTLDBeaconManager:init()
   10. CTLDTroopManager:init()
   11. CTLDCrateManager:init()
-  12. CTLDVehicleManager:init()
+  12. CTLDVehicleSpawner:init()
   13. CTLDFOBManager:init()
-  14. CTLDAASystemManager:init()
-  15. CTLDRecon:init()
-  16. CTLDJtacManager:init()
+  14. CTLDCrateAssemblyManager:init()
+  15. CTLDReconManager:init()
+  16. CTLDJTACManager:init()
   17. CTLDPlayerManager:init()
   18. self:_initAITransports()               -- INIT-A : détection pilotes IA
   19. world.addEventHandler(self)
@@ -1069,14 +1072,14 @@ init()
 
 ---
 
-### 4.17 CTLDAASystemManager
+### 4.17 CTLDCrateAssemblyManager
 
-**Responsabilité** : Singleton gérant les systèmes AA multi-caisses (HAWK, Patriot, NASAMS, BUK, KUB, S-300). Le déploiement physique de chaque système est délégué à `CTLDSceneManager` via une scène dédiée par type de système. CTLDAASystemManager gère le registre runtime des systèmes assemblés, la logique de réarmement/réparation et les limites de coalition.
+**Responsabilité** : Singleton gérant les systèmes AA multi-caisses (HAWK, Patriot, NASAMS, BUK, KUB, S-300). Le déploiement physique de chaque système est délégué à `CTLDSceneManager` via une scène dédiée par type de système. CTLDCrateAssemblyManager gère le registre runtime des systèmes assemblés, la logique de réarmement/réparation et les limites de coalition.
 
 **Fichier cible** : `src/CTLD_aasystem.lua`
 **Statut** : 🆕 À créer (migration depuis `source/CTLD_core.lua`)
 
-**Principe d'intégration dans le flux unpack** : les caisses AA apparaissent dans le menu "Crates: Vehicle/FOB/Drone" comme n'importe quelle caisse. Quand `CTLDCrateManager:unpackCrate()` est appelé, si la caisse est reconnue par `CTLDAASystemManager:getSystemForCrate()`, le traitement est délégué à `CTLDAASystemManager:tryAssemble()` (ou tryRearm/tryRepair selon le contexte). Aucune commande de menu dédiée n'est créée.
+**Principe d'intégration dans le flux unpack** : les caisses AA apparaissent dans le menu "Crates: Vehicle/FOB/Drone" comme n'importe quelle caisse. Quand `CTLDCrateManager:unpackCrate()` est appelé, si la caisse est reconnue par `CTLDCrateAssemblyManager:getSystemForCrate()`, le traitement est délégué à `CTLDCrateAssemblyManager:tryAssemble()` (ou tryRearm/tryRepair selon le contexte). Aucune commande de menu dédiée n'est créée.
 
 **Scènes à créer par système** (une scène = un type de système) :
 
@@ -1103,15 +1106,15 @@ init()
 
 | Signature | Description |
 |---|---|
-| `CTLDAASystemManager.getInstance()` | Singleton |
-| `CTLDAASystemManager:getSystemForCrate(crateUnit)` | Retourne le template AA si `crateUnit` est un composant AA, sinon nil |
-| `CTLDAASystemManager:tryAssemble(unitName, nearbyCrates, template)` | Vérifie que le set de caisses est complet → déclenche la scène de spawn → `registerSystem()` |
-| `CTLDAASystemManager:tryRearm(unitName, nearbyCrates, template)` | Détecte un système existant à proximité → re-spawn le lanceur via la scène |
-| `CTLDAASystemManager:tryRepair(unitName, nearestCrate, template)` | Détecte un système endommagé → re-spawn le groupe complet via la scène |
-| `CTLDAASystemManager:countActiveSystems(coalition)` | Compte les systèmes actifs et complets pour la coalition |
-| `CTLDAASystemManager:getLimit(coalition)` | Retourne `AASystemLimitBLUE` ou `AASystemLimitRED` |
-| `CTLDAASystemManager:registerSystem(groupName, details)` | Enregistre un système dans `_activeSystems` |
-| `CTLDAASystemManager:unregisterSystem(groupName)` | Retire un système du registre |
+| `CTLDCrateAssemblyManager.getInstance()` | Singleton |
+| `CTLDCrateAssemblyManager:getSystemForCrate(crateUnit)` | Retourne le template AA si `crateUnit` est un composant AA, sinon nil |
+| `CTLDCrateAssemblyManager:tryAssemble(unitName, nearbyCrates, template)` | Vérifie que le set de caisses est complet → déclenche la scène de spawn → `registerSystem()` |
+| `CTLDCrateAssemblyManager:tryRearm(unitName, nearbyCrates, template)` | Détecte un système existant à proximité → re-spawn le lanceur via la scène |
+| `CTLDCrateAssemblyManager:tryRepair(unitName, nearestCrate, template)` | Détecte un système endommagé → re-spawn le groupe complet via la scène |
+| `CTLDCrateAssemblyManager:countActiveSystems(coalition)` | Compte les systèmes actifs et complets pour la coalition |
+| `CTLDCrateAssemblyManager:getLimit(coalition)` | Retourne `AASystemLimitBLUE` ou `AASystemLimitRED` |
+| `CTLDCrateAssemblyManager:registerSystem(groupName, details)` | Enregistre un système dans `_activeSystems` |
+| `CTLDCrateAssemblyManager:unregisterSystem(groupName)` | Retire un système du registre |
 
 **Logique tryAssemble** :
 ```
@@ -1138,11 +1141,11 @@ Récapitulatif des paginations :
 | Troop Transport > Load … | 9/p | CTLDTroopManager |
 | Crates > catégories | 10/p | CTLDCrateManager |
 | Crates > \<Catégorie\> > caisses | 10/p | CTLDCrateManager |
-| CTLD Commands > Pack Vehicles | 10/p | CTLDVehicleManager |
+| CTLD Commands > Pack Vehicles | 10/p | CTLDVehicleSpawner |
 | CTLD Commands > Unpack Any Crate | 10/p | CTLDCrateManager |
-| JTAC > groupes JTAC | 9/p | CTLDJtacManager |
-| JTAC > \<Groupe\> > cibles | 10/p | CTLDJtacManager |
-| JTAC > \<Groupe\> > Actions | 10/p | CTLDJtacManager |
+| JTAC > groupes JTAC | 9/p | CTLDJTACManager |
+| JTAC > \<Groupe\> > cibles | 10/p | CTLDJTACManager |
+| JTAC > \<Groupe\> > Actions | 10/p | CTLDJTACManager |
 
 **Évolution EVO-01** : le menu statique "Unpack Crate" est remplacé par "Unpack Any Crate", sous-menu dynamique contextuel construit à chaque clic via `CTLDCrateManager:buildUnpackSubMenu()`.
 
@@ -1196,14 +1199,14 @@ CTLD_userConfig.lua
 | Réf | Description | Classe cible |
 |---|---|---|
 | EVO-01 | Menu "Unpack Any Crate" → sous-menu dynamique contextuel [PAG: 10/p] | CTLDCrateManager |
-| EVO-02 | Renommage pack → pack (config, menus, méthodes) | CTLDConfig, CTLDVehicleManager |
+| EVO-02 | Renommage pack → pack (config, menus, méthodes) | CTLDConfig, CTLDVehicleSpawner |
 | EVO-03 | FOB déployé via scène DCS | CTLDFOBManager |
 | EVO-04 | Nouveaux descripteurs : FOB_Outpost, FOB_Watchtower | CTLDObjectsDescDb |
 | EVO-05 | API mission maker `registerSceneModel()` documentée | documentation/missionmaker_guide.md |
 | EVO-06 | Remplacement `mist.dynAddStatic()` → `CTLDUtils.dynAddStatic()` | CTLDUtils, mineFieldSceneDatas |
-| EVO-07 | Spawn des systèmes AA via scènes DCS dédiées (6 scènes) | CTLDAASystemManager, CTLDSceneManager |
+| EVO-07 | Spawn des systèmes AA via scènes DCS dédiées (6 scènes) | CTLDCrateAssemblyManager, CTLDSceneManager |
 | EVO-08 | Dispatch unpack() : priorité scène → AA system → classique | CTLDCrateManager |
-| EVO-09 | Suppression du chargement virtuel de véhicules depuis pickupZone — voir détail ci-dessous | CTLDZoneManager, CTLDVehicleManager |
+| EVO-09 | Suppression du chargement virtuel de véhicules depuis pickupZone — voir détail ci-dessous | CTLDZoneManager, CTLDVehicleSpawner |
 | EVO-10 | Convention de nommage DCS pour déclaration des zones sans scripting — voir section 4.6 | CTLDZoneManager |
 | EVO-11a | logisticZone : suppression de l'objet statique DCS comme ancre — remplacé par trigger zone LGZ | CTLDZoneManager |
 | EVO-11b | logisticZone : suppression de l'interdiction d'unpack en zone logistique — unpack autorisé partout ; `farEnoughFromLogisticZone` supprimé | CTLDZoneManager, CTLDCrateManager |
@@ -1242,9 +1245,9 @@ Véhicule posé sur carte
 
 > Note : le fractionnement en N caisses permet la coopération multi-appareils (chaque appareil transporte une partie des caisses).
 
-#### Impact sur CTLDVehicleManager
+#### Impact sur CTLDVehicleSpawner
 
-`CTLDVehicleManager` gère exclusivement le workflow Pack/unpack (Workflow B). Le Workflow A est géré nativement par DCS sans intervention CTLD.
+`CTLDVehicleSpawner` gère exclusivement le workflow Pack/unpack (Workflow B). Le Workflow A est géré nativement par DCS sans intervention CTLD.
 
 ---
 

@@ -1,6 +1,6 @@
 # CTLD Menu Manager — Architecture & Design
 
-*January 9, 2026*
+*January 9, 2026 — revised 2026-06-28: class names updated (`ctld.MenuManager`, `ctld.Menu`)*
 
 ---
 
@@ -10,7 +10,7 @@ The CTLD Menu Manager is a singleton-based hierarchical menu system designed to 
 
 ### Key Components
 
-- **MenuManager** — Singleton that manages all group menus globally
+- **ctld.MenuManager** — Singleton that manages all group menus globally
 - **Menu** — Individual menu structure for a single group
 - **Node** — Single item in the menu tree (submenu or command)
 - **Logger** — Handles INFO, WARN, ERROR logging
@@ -23,7 +23,7 @@ The CTLD Menu Manager is a singleton-based hierarchical menu system designed to 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    MenuManager (Singleton)              │
+│                    ctld.MenuManager (Singleton)              │
 │                                                         │
 │  Instance: {                                            │
 │    menus = {                                            │
@@ -221,22 +221,22 @@ F10 → Next Page:
 ## Singleton Pattern
 
 ```lua
-MenuManager = { _instance = nil }
+ctld.MenuManager = { _instance = nil }
 
-function MenuManager:getInstance()
+function ctld.MenuManager:getInstance()
     if not self._instance then
         self._instance = self:new()
     end
     return self._instance
 end
 
-function MenuManager:new()
+function ctld.MenuManager:new()
     local obj = {
         menus = {},
         nextMenuId = 1,
         logger = createLogger()
     }
-    setmetatable(obj, { __index = MenuManager })
+    setmetatable(obj, { __index = ctld.MenuManager })
     return obj
 end
 ```
@@ -245,7 +245,7 @@ end
 
 | Phase | Event | State |
 |---|---|---|
-| 1. Load | Script loads | `MenuManager = {}`, `_instance = nil` |
+| 1. Load | Script loads | `ctld.MenuManager = {}`, `_instance = nil` |
 | 2. First Access | `getInstance()` | `_instance` created, `menus = {}` |
 | 3. Group Create | `createMenuForGroup()` | `menus[groupId] = new Menu` |
 | 4. Runtime | Modify, refresh menus | Menus persist across modifications |
@@ -255,7 +255,7 @@ end
 
 ## Callback Wrapping & GroupId Injection
 
-DCS calls `func(arg)` when a player clicks a command. The MenuManager wraps callbacks in a closure to inject the `groupId`:
+DCS calls `func(arg)` when a player clicks a command. The ctld.MenuManager wraps callbacks in a closure to inject the `groupId`:
 
 ```lua
 local wrappedFunc = function()

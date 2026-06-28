@@ -1,12 +1,12 @@
 # CTLD Menu Manager — Technical Specification Reference
 
-*January 9, 2026*
+*January 9, 2026 — revised 2026-06-28: class names updated (`ctld.MenuManager`, `ctld.Menu`); `addSubMenu`/`addCommand` carry `opts` parameter in v2*
 
 ---
 
 ## API Overview
 
-The MenuManager provides public methods in four categories:
+The ctld.MenuManager provides public methods in four categories:
 
 - **Singleton management** — `getInstance()`
 - **Group menu creation** — `createMenuForGroup()`
@@ -18,20 +18,20 @@ The MenuManager provides public methods in four categories:
 
 ## Complete Method Reference
 
-### 1. `MenuManager:getInstance()`
+### 1. `ctld.MenuManager:getInstance()`
 
-Returns the singleton MenuManager instance. Creates it on first call.
+Returns the singleton ctld.MenuManager instance. Creates it on first call.
 
 ```lua
-local mgr = MenuManager:getInstance()
+local mgr = ctld.MenuManager:getInstance()
 local menu = mgr:createMenuForGroup(42)
 ```
 
-**Returns:** MenuManager singleton instance.
+**Returns:** ctld.MenuManager singleton instance.
 
 ---
 
-### 2. `MenuManager:createMenuForGroup(groupId)`
+### 2. `ctld.MenuManager:createMenuForGroup(groupId)`
 
 Creates an empty menu structure for a group. Must be called before adding items.
 
@@ -52,7 +52,7 @@ end
 
 ---
 
-### 3. `Menu:addSubMenu(pathTable, menuName)`
+### 3. `ctld.Menu:addSubMenu(pathTable, menuName)`
 
 Adds a submenu at the specified path.
 
@@ -77,7 +77,7 @@ end
 
 ---
 
-### 4. `Menu:addCommand(pathTable, commandName, functionToCall, anyArgument)`
+### 4. `ctld.Menu:addCommand(pathTable, commandName, functionToCall, anyArgument)`
 
 Adds an executable command at the specified path.
 
@@ -108,7 +108,7 @@ local result = menu:addCommand(
 
 ---
 
-### 5. `Menu:removeMenuBranch(pathTable)`
+### 5. `ctld.Menu:removeMenuBranch(pathTable)`
 
 Recursively removes a menu branch and all its children.
 
@@ -132,7 +132,7 @@ end
 
 ---
 
-### 6. `MenuManager:refreshMenuForGroup(groupId)`
+### 6. `ctld.MenuManager:refreshMenuForGroup(groupId)`
 
 Clears entire DCS menu for group and reconstructs from memory. Atomic operation.
 
@@ -160,7 +160,7 @@ local result = mgr:refreshMenuForGroup(groupId)
 
 ---
 
-### 7. `MenuManager:getMenuByGroupId(groupId)`
+### 7. `ctld.MenuManager:getMenuByGroupId(groupId)`
 
 Retrieves menu by group numeric ID.
 
@@ -168,7 +168,7 @@ Retrieves menu by group numeric ID.
 
 ---
 
-### 8. `MenuManager:getMenuByGroupName(groupName)`
+### 8. `ctld.MenuManager:getMenuByGroupName(groupName)`
 
 Retrieves menu by group name string.
 
@@ -176,7 +176,7 @@ Retrieves menu by group name string.
 
 ---
 
-### 9. `MenuManager:getMenuByUnitName(unitName)`
+### 9. `ctld.MenuManager:getMenuByUnitName(unitName)`
 
 Retrieves menu for the group containing a specific unit.
 
@@ -194,7 +194,7 @@ Retrieves menu for the group containing a specific unit.
     children   = { ... },   -- Array of child nodes
     _lookup    = { ... },   -- Path → node reference (O(1))
     nextItemId = number,    -- Counter for unique IDs
-    manager    = reference  -- Back-reference to MenuManager
+    manager    = reference  -- Back-reference to ctld.MenuManager
 }
 
 -- Submenu node
@@ -253,7 +253,7 @@ All failing methods return:
 
 | Scenario | Memory |
 |---|---|
-| MenuManager instance | ~1 KB |
+| ctld.MenuManager instance | ~1 KB |
 | Single menu — 15 items | ~2 KB |
 | Single menu — 1000 items | ~100 KB |
 | 10 groups, 150 items total | ~20 KB |
@@ -278,7 +278,7 @@ All failing methods return:
 
 **All-or-nothing refresh** — Cannot update a single item; must clear and rebuild entire menu. Workaround: accumulate changes, apply via single `refresh()`.
 
-**Pagination is manual** — DCS doesn't auto-paginate. Workaround: MenuManager handles pagination automatically during refresh.
+**Pagination is manual** — DCS doesn't auto-paginate. Workaround: ctld.MenuManager handles pagination automatically during refresh.
 
 **No callback introspection** — Cannot validate Lua function signatures at runtime. Workaround: document expected signature, validate via `pcall`.
 

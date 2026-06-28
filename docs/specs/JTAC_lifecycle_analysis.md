@@ -1,7 +1,7 @@
 # JTAC Lifecycle & State Transitions Analysis
 
-> Status: IN PROGRESS — à compléter après corrections bugs B1-B4 + cleanup menu drone
-> Date: 2026-05-01
+> Status: FINAL — all B1–B8 bugs resolved. Updated 2026-06-28 against code.
+> Initial analysis: 2026-05-01
 
 ---
 
@@ -167,51 +167,50 @@ PATH 3: deployAirJTAC() (correct path for drone)
 
 ---
 
-## 4. Bugs critiques à corriger
+## 4. Bug resolution status (verified 2026-06-28)
 
-### B1 — JTAC Troop: JTAC不应该laser depuis le transport au BOARD
-**Statut**: ❓ À VÉRIFIER — `loadFromZone` ne spawn pas de DCS group. Le JTAC n'est pas encore actif au BOARD. Le vrai problème est peut-être au DEPLOY où le JTAC est lancé immédiatement après spawn.
+All bugs identified in this analysis were resolved in subsequent implementation sessions.
 
-### B2 — JTAC Troop: orphan JTAC après EXTRACT
-**Statut**: ❓ DÉPEND DE S_EVENT_DEAD
-- `nearest.group:destroy()` génère-t-il S_EVENT_DEAD pour le group ?
-- CTLDCoreManager._isJTACGroup() détecte-t-il le group comme JTAC (via groupName substring "jtac") ?
-- Si oui → killJTAC() appelé proprement
-- Si non → orphan dans jtacs[]
+### B1 — JTAC Troop: JTAC active during BOARD
+**Status**: ✅ NOT A BUG — `embarkFromTroopZone()` (ex-`loadFromZone`) does not spawn a DCS group.
+The troop group is stored as `CTLDTroopGroup` in `_inTransit` (virtual state, no DCS entity).
+JTAC is only started on `disembark()` (ex-`deploy()`), after the DCS group is spawned.
 
-### B3 — JTAC Troop DEPLOY: startLase appelé sur groupe pas encore alive
-**Statut**: ❓ VÉRIFIER — y a-t-il un délai entre spawnObject() et startLase() dans deploy()?
+### B2 — JTAC Troop: orphan JTAC after field extract
+**Status**: ✅ RESOLVED [2026-05-02] — Troop lifecycle refactor.
+`embarkFromField()` explicitly calls `deregisterJTAC(jtacName)` for each entry in `_jtacUnits`
+**before** `group:destroy()`. This prevents `S_EVENT_DEAD` from falsely triggering `killJTAC()`.
+Code: `CTLD_troop.lua` — `embarkFromField()`, loop on `_jtacUnits` before destroy.
 
-### B4 — Troop JTAC: détection hasJtac incohérente
-**Statut**: ⚠️ CODE À RISQUE
-- `extract()` ligne 689: `hasJtac = nearest.groupName:lower():find("jtac") ~= nil` (substring)
-- `deploy()` ligne 566: `if group.hasJtac then` (flag du template, setté via loadableGroups)
-- Ces deux méthodes différentes peuvent donner des résultats différents pour le même groupe
+### B3 — JTAC Troop DEPLOY: startLase on group not yet alive
+**Status**: ✅ NOT A BUG — `startLase()` uses `_tryInitFlying()` with T+2s retry logic.
+If the DCS group is not yet alive at first poll, the loop retries until the unit is found.
 
-### B5 — JTAC Drone: Request JTAC Equipment menu liste des drones non cargaables
-**Statut**: ⚠️ BUG CONFIRMÉ
-- `JTAC_unitTypeNames` contient "MQ-9 Reaper" et "RQ-1A Predator" (aircraft)
-- Menu `refreshJtacEquipmentSection` affiche ces types
-- spawnVehicleForTransport() crée un groupe GROUND avec un type AIRPLANE → CATEGORY MISMATCH
-- Les drones ne peuvent pas être chargés dans un transport → menu trompeur
-- **Action**: supprimer les drones de `JTAC_unitTypeNames` (laisser que Hummer/SKP-11)
+### B4 — Troop JTAC: inconsistent hasJtac detection (substring vs flag)
+**Status**: ✅ RESOLVED [2026-05-02] — Troop lifecycle refactor eliminated the substring approach.
+`_jtacUnits = { [unitName] = true }` map is built from template roles at `embarkFromTroopZone()` time
+(role == "jtac") and rebuilt from real DCS unit names after `_syncFromDCSGroup()`.
+Old `extract()` substring approach (`groupName:find("jtac")`) no longer exists.
 
-### B6 — Drone JTAC: unpack crate ne démarre pas le JTAC automatiquement
-**Statut**: ⚠️ BUG CONFIRMÉ
-- `_dispatchPostSpawn()` ne traite QUE les desc.isJTAC ground vehicles
-- Pour les drones (`spawnAs=AIRPLANE`), la fonction ne fait rien
-- Le drone est spawned mais le JTAC n'est pas démarré
-- L'activation JTAC pour drone doit passer par `deployAirJTAC()` ou par un autre chemin menu
+### B5 — JTAC Drone: Request JTAC Equipment menu listed non-loadable drones
+**Status**: ✅ RESOLVED [2026-04-26 / CL-4] — `JTAC_unitTypeNames` setting deprecated and removed.
+The "Request JTAC Equipment" menu is now built from `getJTACDescriptors()` which returns crates
+with `isJTAC=true`. Drones (MQ-9, RQ-1A) appear only in the standard Request Equipment crate menu
+(spawnAs=AIRPLANE path), not in a separate vehicle spawn menu.
 
-### B7 — JTAC Vehicle DCS native: vehicle.unit reste alive après loadVehicle dcs_native
-**Statut**: ✅ GÉRÉ — `loadVehicle` avec `method="dcs_native"` ne détruit PAS le unit (ligne 438-443). Unit stays alive but invisible. `setJTACInTransit` appelé → state=IN_TRANSIT, jtacs[]=nil. C'est correct.
+### B6 — Drone JTAC: unpack crate did not start JTAC automatically
+**Status**: ✅ RESOLVED — `_dispatchPostSpawn(desc, gname)` checks `if desc.isJTAC` (no ground/air
+distinction). For drones with `isJTAC=true` and `spawnAs=AIRPLANE`, `startLase(gname)` IS called.
+Code: `CTLD_crate.lua` — `_dispatchPostSpawn()` line ~2121.
 
-### B8 — Parachute Vehicle: véhicule delivered après parachute — que se passe-t-il pour le JTAC?
-**Statut**: ❓ À VÉRIFIER
-- `parachuteVehicle()` → vehicle:setState(DELIVERED) → `_parachuteEffect:onStart()` → timer.scheduleFunction(onLanded)
-- `onLanded` est un no-op dans CTLDNullParachuteEffect
-- Où le véhicule est-il réellement respawné après le parachute?
-- Le véhicule reste dans l'état DELIVERED jusqu'à uneventuelle action de unload
+### B7 — JTAC Vehicle DCS native: vehicle.unit stays alive after loadVehicle dcs_native
+**Status**: ✅ WAS CORRECT BY DESIGN — DCS native load keeps the unit alive (linked in aircraft).
+`setJTACInTransit()` → state=IN_TRANSIT, jtacs[]=nil, laser freed. Confirmed correct.
+
+### B8 — Parachute Vehicle: JTAC state after landing
+**Status**: ✅ RESOLVED [2026-05-06 / Feature K GAP-K1] — `parachuteVehicle()` now calls
+`vehicle:setState(WAITING)` and `jtacMgr:resumeJTAC(gname)` in the landing callback.
+Code: `CTLD_vehicle.lua` — `parachuteVehicle()` lines ~1018, ~1063.
 
 ---
 
