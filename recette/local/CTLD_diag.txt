@@ -1,2 +1,0 @@
-=== scan() start ===
-=== scan() end: ok=true err=nil  _activeScans[player]=false
