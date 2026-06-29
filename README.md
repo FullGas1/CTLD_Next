@@ -2,7 +2,7 @@
 
 Complete Troops and Logistics Deployment for DCS World — **v2 modular rewrite**
 
-> **Looking for the legacy v1 documentation?** See [README_old.md](README_old.md).
+> **Migration from v1?** See the [Migration from v1](#migration-from-v1) section below.
 
 ---
 
