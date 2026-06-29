@@ -771,3 +771,346 @@ This means several JTACs losing their target simultaneously (e.g. explosion) eac
 **`CTLDJTACDetector.findAllVisibleEnemies` vs `findNearestVisibleEnemy`:**
 
 `findNearestVisibleEnemy` is now a thin wrapper returning `findAllVisibleEnemies()[1]`. It is kept for any callsite that only needs the single best candidate (no deconfliction needed).
+
+---
+
+## 12. Zone management
+
+**Source:** `src/CTLD_zone.lua`
+**Entities:** `CTLDTroopZone`, `CTLDLogisticZone`
+**Singleton:** `CTLDZoneManager`
+
+### 12.1 Zone types
+
+| Type | Prefix | Config source | Purpose |
+| --- | --- | --- | --- |
+| TRZ | `TRZ_` | DCS trigger zone name | Troop pickup / extract / dropoff / waypoint |
+| LGZ | `LGZ_` | DCS trigger zone name | Logistic resupply point |
+| WPZ | `WPZ_` | DCS trigger zone name | Waypoint march destination for deployed troops |
+| AIZ | — | `cfg.settings["aiZones"]` table | AI transport pickup / dropoff (Feature S) |
+| EXZ | dynamic | `createExtractZone()` | Extraction zone created at runtime (troop return) |
+
+TRZ, LGZ, and WPZ are discovered at init by scanning DCS trigger zones (`trigger.misc.getZone`). AIZ zones are loaded from `userConfig` only.
+
+### 12.2 TRZ naming convention
+
+```
+TRZ_<name>
+```
+
+A single zone name covers all roles; the roles are declared in `cfg.settings["troopPickupZones"]` / `extractZones` / `dropoffZones` tables rather than encoded in the name. The `CTLDTroopZone` object carries boolean flags `isPickup`, `isExtract`, `isDropoff`, `isWaypoint`, `isAIPickup`, `isAIDropoff`.
+
+### 12.3 Discovery algorithm
+
+`CTLDZoneManager:init()` calls in order:
+
+1. `_discoverTRZ()` — iterates all DCS trigger zones, picks those starting with `TRZ_`, constructs a `CTLDTroopZone` from the config tables.
+2. `_discoverLGZ()` — picks zones starting with `LGZ_`, constructs `CTLDLogisticZone`.
+3. `_discoverWPZ()` — picks zones starting with `WPZ_`, constructs waypoint zone records.
+4. `_loadAIZonesFromConfig()` — reads `cfg.settings["aiZones"]` array; each entry is a `CTLDTroopZone` marked with `isAIPickup` / `isAIDropoff`.
+5. `_loadLegacyZones()` — optional backward-compat pass for old naming conventions.
+6. `_validateZoneNames()` — emits G1–G5 warnings/errors via `ctld.utils.log`.
+
+### 12.4 Key public methods
+
+```lua
+zm:getTroopZone(zoneName)                       -- → CTLDTroopZone | nil
+zm:getTroopZonesForCoalition(coalition)         -- → { CTLDTroopZone, ... }
+zm:isUnitInZone(unitName, zoneType)             -- zoneType: "pickup"|"extract"|"dropoff"|"waypoint"
+zm:getLogisticZoneForUnit(unitName)             -- → CTLDLogisticZone | nil
+zm:registerFOBAsLogistic(name, point, r, coa)  -- add a built FOB as an LGZ at runtime
+zm:unregisterLogistic(name)                     -- remove a dynamic LGZ (e.g. FOB destroyed)
+zm:createExtractZone(zoneName, flag, smoke)     -- runtime EXZ creation
+zm:setTroopZoneActive(zoneName, active)         -- enable/disable a TRZ at runtime
+```
+
+---
+
+## 13. Vehicle system
+
+**Source:** `src/CTLD_vehicle.lua`
+**Entity:** `CTLDVehicle`
+**Singleton:** `CTLDVehicleSpawner`
+
+### 13.1 CTLDVehicle state machine
+
+```
+WAITING → LOADED → DELIVERED
+                ↘ WAITING  (unloaded but not yet delivered)
+```
+
+| State | Meaning |
+| --- | --- |
+| `WAITING` | Spawned at logistic zone, ready to be loaded |
+| `LOADED` | Inside a transport's cargo hold |
+| `DELIVERED` | Unloaded and operational in the field |
+
+### 13.2 Load / unload pipeline
+
+**Load** (`loadVehicle(vehicle, transport, player, method)`):
+
+1. Check `caps.canTransportWholeVehicle` and `caps.maxVehiclesOnboard` capacity.
+2. Check distance ≤ `maximumDistancePackableUnitsSearch`.
+3. Destroy DCS unit (vehicle disappears from map), transition to `LOADED`.
+4. Publish `OnVehicleLoaded { vehicle, transport, player, method }`.
+
+**Unload** (`unloadVehicle(vehicle, transport, player, method, rearSector)`):
+
+1. `computeSafeDropPos(transport, rearSector)` — places the spawn point behind the transport, outside the bbox.
+2. `CTLDObjectRegistry.spawnObject(...)` — re-spawns the DCS unit.
+3. Transition to `DELIVERED`, publish `OnVehicleUnloaded`.
+
+### 13.3 DCS native cargo integration
+
+`CTLDCrateManager:_checkNativeDCSCargo()` (1 s tick) scans all player transports for `useNativeDcsCargoSystem=true` in their `capabilitiesByType` entry. For those, it detects crates physically inside the transport bbox using `_pointInBBox`. The crate is promoted to CTLD-managed (DCS static destroyed, `crate:load(transport)` called) so the full CTLD pipeline applies.
+
+---
+
+## 14. Beacon system
+
+**Source:** `src/CTLD_beacon.lua`
+**Singleton:** `CTLDBeaconManager`
+
+### 14.1 Beacon types
+
+| Type | DCS API | Purpose |
+| --- | --- | --- |
+| Radio beacon | `trigger.action.outSoundForCoalition` + timer | Audible ADF homing signal |
+| TACAN | Encodes frequency as a DCS beacon | TACAN tuning in cockpit |
+| IR beacon | `Spot.createInfraRed` | NVG-visible IR beacon |
+
+### 14.2 Mark ID allocation
+
+All mark IDs in CTLD are allocated from a single monotonically increasing counter:
+
+```lua
+ctld._markIdCounter  -- initialized to 10000 at first load
+ctld.utils.getNextMarkId()  -- increments and returns next ID
+```
+
+Beacons, recon marks, and `ctld.utils.drawQuad()` all use `getNextMarkId()`. IDs are **never reused** after `trigger.action.removeMark` to comply with DCS constraints.
+
+### 14.3 Battery system
+
+Each spawned beacon has a `batteryLife` (seconds, default from `cfg.settings["beaconBatteryLife"]`). A 1 s timer tick decrements the counter; at zero the beacon is auto-removed. Battery state persists across player reconnects via the beacon registry.
+
+---
+
+## 15. Recon system
+
+**Source:** `src/CTLD_recon.lua`
+**Singleton:** `CTLDReconManager`
+
+### 15.1 Scan → mark pipeline
+
+1. Player activates recon from F10 menu (or automatic on FOB/crate events).
+2. `CTLDReconManager:scan(playerObj)` calls `world.searchObjects` in a sphere around the transport.
+3. Each detected enemy unit is filtered by LOS (`land.isVisible`), distance, and coalition.
+4. Surviving units are drawn as F10 map marks using `ctld.utils.drawQuad` (one mark per unit, coalitionId = player coalition).
+5. Marks are registered in `_marks[groupId]` keyed by mark ID for later removal.
+
+### 15.2 Layer lifecycle
+
+| Event | Action |
+| --- | --- |
+| Recon activated | `_clearMarks(groupId)` then `scan()` → new marks |
+| Recon deactivated | `_clearMarks(groupId)` — `trigger.action.removeMark` for each ID |
+| Player disconnects | `cleanup()` removes all marks for that group |
+| `reconF10Menu = false` | Section not registered in F10 menu; scanning still callable via API |
+
+---
+
+## 16. F10 Menu system
+
+**Source:** `src/CTLD_menu.lua`, `src/CTLD_player.lua`
+**Singletons:** `CTLDMenuManager`, `CTLDPlayerManager`
+
+### 16.1 Architecture
+
+```
+CTLDPlayerManager          CTLDMenuManager
+  _menuSections[]     →      _menus{}  (groupId → CTLDMenu)
+  registerMenuSection()        addSubMenu / addCommand
+  buildMenu(playerObj)         _getNode(pathTable)
+  refreshForUnit(unitName)     setBranchEnabled(pathTable, bool)
+```
+
+`CTLDMenuManager` maintains an in-memory tree of menu nodes. `missionCommands.*` calls are the DCS rendering side-effect — the tree is the authoritative state.
+
+### 16.2 Section registration
+
+Each manager registers its menu section once, at `getInstance()` time:
+
+```lua
+-- Example from CTLD_crate.lua
+CTLDPlayerManager.getInstance():registerMenuSection({
+    key       = "crates",
+    manager   = _cmInstance,
+    method    = "buildMenuSection",   -- fn(self, playerObj, menu)
+    configKey = "enableCrates",       -- ctld.gs(configKey) must be true; nil = always active
+    order     = 40,                   -- lower = higher in menu
+})
+```
+
+`buildMenu(playerObj)` iterates all registered sections sorted by `order`, checks `configKey`, then calls `manager:buildMenuSection(playerObj, menu)`.
+
+### 16.3 Flight-state refresh
+
+Menu items that depend on in-flight state (e.g. "Release Slingload" enabled only in air with a slingloaded crate) are not rebuilt — they are toggled via `setBranchEnabled`. Each manager exposes a `refreshMenuSection(playerObj)` that updates enabled states without rebuilding the tree.
+
+This pattern avoids re-registering DCS commands (which would leak orphan menu items).
+
+### 16.4 Adding a menu section to a new module
+
+1. Call `CTLDPlayerManager.getInstance():registerMenuSection(sectionDef)` in your manager's `getInstance()`.
+2. Implement `Manager:buildMenuSection(playerObj, menu)` — build sub-menu tree using `menu:addSubMenu` / `menu:addCommand`.
+3. Implement `Manager:refreshMenuSection(playerObj)` — update `setBranchEnabled` for dynamic items.
+4. Trigger `CTLDPlayerManager.getInstance():refreshForUnit(unitName)` on any state change that affects visibility.
+
+---
+
+## 17. Player tracking
+
+**Source:** `src/CTLD_player.lua`
+**Singleton:** `CTLDPlayerManager`
+
+### 17.1 Player object schema
+
+```lua
+{
+    unitName       = "UH-1H-1",
+    groupId        = 9901,
+    groupName      = "Grp_1",
+    coalition      = 2,        -- coalition.side.BLUE
+    typeName       = "UH-1H",
+    isTransport    = true,
+    canCarryVehicles = false,
+    loadedCrates   = {},       -- { [crateName] = CTLDCrate }
+    loadedTroops   = {},       -- { CTLDTroopGroup, ... }
+    loadedVehicles = {},       -- { CTLDVehicle, ... }
+}
+```
+
+### 17.2 Lifecycle
+
+| DCS event | CTLDPlayerManager action |
+| --- | --- |
+| `S_EVENT_BIRTH` / `S_EVENT_PLAYER_ENTER_UNIT` | `addPlayer(unit)` — register, build menu |
+| `S_EVENT_PLAYER_LEAVE_UNIT` | `removePlayer(unitName)` — cleanup menus + cargo |
+| `S_EVENT_LAND` | `refreshForUnit(unitName)` — update flight-state menu items |
+| `S_EVENT_TAKEOFF` | same |
+
+`addPlayer` also propagates to all registered managers' `onPlayerJoin(playerObj)` hooks via the `OnPlayerJoin` event.
+
+### 17.3 Cargo weight tracking
+
+`_updateWeight(unitName)` sums `loadedCrates`, `loadedTroops`, and `loadedVehicles` weights and compares against `cfg.settings["maxTransportWeight"]`. If exceeded, a warning is shown and the load is rejected. Weight is recalculated after every load/unload operation.
+
+---
+
+## 18. AA system assembly
+
+**Source:** `src/CTLD_aasystem.lua`
+**Singleton:** `CTLDCrateAssemblyManager`
+
+### 18.1 Purpose
+
+`CTLDCrateAssemblyManager` manages multi-crate AA system assembly. When enough crates of the right types are unpacked in proximity, it spawns the complete AA system (e.g. HAWK battery, Patriot PAC-2, KUB, BUK, S-300, NASAMS).
+
+### 18.2 Template format
+
+Templates are declared in `cfg.settings["ctldCrateAssemblyTemplates"]`:
+
+```lua
+{
+    name         = "HAWK Battery",
+    coalition    = 2,          -- BLUE
+    cratesNeeded = {           -- list of crate unit types required
+        { unit="AAA_HAWK_SR", count=1 },
+        { unit="AAA_HAWK_TR", count=1 },
+        { unit="AAA_HAWK_LN", count=3 },
+    },
+    spawnGroup   = {           -- DCS group descriptor to spawn on assembly
+        { type="Hawk sr", x=0, y=0, heading=0 },
+        ...
+    },
+    aaLaunchers  = { ... },    -- optional launcher unit names for auto-activation
+}
+```
+
+`CTLDCrateAssemblyManager.TEMPLATES` is populated at `CTLDConfig:load()` time so templates can reference config values.
+
+### 18.3 Assembly check
+
+Every time a crate is unpacked, `_checkAssemblyReady(position, coalition)` scans all unpacked crates within `cfg.settings["crateAssemblyRadius"]`. If a complete template set is found, `spawnSystemAt(templateName, point, coa, countryId)` is called and `OnAASystemDeployed` is published.
+
+### 18.4 AI zone delivery (`isAASystem`)
+
+AI transports can deliver AA systems via zone config:
+
+```lua
+vehicleStock = { ["HAWK Battery"] = 1 }
+```
+
+In `CTLDCoreManager:onAILand`, the `aiPickVehicleEntry()` return value carries `isAASystem=true`. The AI dropoff branch calls `CTLDCrateAssemblyManager.getInstance():spawnSystemAt(...)` directly, bypassing the crate assembly flow.
+
+---
+
+## 19. Internal libraries
+
+### 19.1 class.lua — OOP base
+
+`src/core/class.lua` provides the single-inheritance class system used throughout CTLD:
+
+```lua
+MyClass = class()          -- create class
+MyClass2 = class(MyClass)  -- subclass
+
+function MyClass:init(data) ... end   -- constructor (called by :new())
+local obj = MyClass:new({ ... })      -- instantiate
+
+-- Metacall pattern used by singletons:
+local o = setmetatable({}, MyClass)
+MyClass.init(o, ...)
+```
+
+`class()` sets `__index` to the class table so instance method lookups fall through to the class.
+
+### 19.2 CTLD_objectRegistry.lua — spawn descriptor store
+
+`CTLDObjectRegistry` is a static registry mapping template keys to DCS group/unit spawn descriptors. It does not manage instances — only descriptors.
+
+```lua
+CTLDObjectRegistry.register(key, descriptor)    -- add a template
+CTLDObjectRegistry.spawnObject(key, coa, country, x, z, hdg, opts)
+    -- → DCS Group object | nil
+```
+
+Scenes register their component descriptors at dofile time. Troop/vehicle templates are registered by their managers at init.
+
+### 19.3 CTLD_modValidator.lua — mod presence probe
+
+`CTLDModValidator` probes whether optional DCS mods (HAWK, Patriot, NASAMS…) are present by attempting a `coalition.addStaticObject` with the mod's unit type and immediately destroying it.
+
+```lua
+CTLDModValidator.getInstance():isPresent("AAA_HAWK_SR")  -- → bool (cached after first probe)
+```
+
+Results are cached in `_cache[typeName]`. The probe is deferred to first use so mission load time is not impacted.
+
+### 19.4 CTLD_utils.lua — utility functions
+
+Key functions available as `ctld.utils.*`:
+
+| Function | Purpose |
+| --- | --- |
+| `log(level, fmt, ...)` | Write to `CTLD.log` (levels: DEBUG, INFO, WARN, ERROR) |
+| `getDistance(caller, p1, p2)` | 2D ground distance between two `{x,z}` points |
+| `getHeadingInRadians(caller, unit, magnetic)` | Unit heading in radians |
+| `inAir(unit)` | True if unit is airborne (AGL + velocity guard) |
+| `getNextMarkId()` | Allocate next unique DCS mark ID from `ctld._markIdCounter` |
+| `getNextUniqId()` | Allocate next unique entity ID from `ctld.utils.UniqIdCounter` |
+| `drawQuad(coalitionId, pts, msg)` | Draw a 4-point polygon on the F10 map |
+| `buildWP(caller, pt, type, speed)` | Build a DCS waypoint table |
+| `getSecureDistanceFromUnit(unitName)` | Minimum spawn clearance radius from a unit's bbox |
+| `dynAddStatic(coalitionId, data)` | `coalition.addStaticObject` wrapper with country resolution |

@@ -1492,7 +1492,9 @@ F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
 - ✅ **TODO-CI-6** : Documenter la procédure L3/L4 dans `docs/dev-guide.md` §Testing
   - `docs/dev-guide.md` §8 réécrit : busted, Witchcraft, CTLD.log, debug config, format sortie, cleanup [2026-06-29]
   - `docs/recette-procedure.md` créé : procédure complète L1→L4 (qui/quand/quoi, ordre, checklist) [2026-06-29]
-- ⚪ **TODO-DOC-1** : Audit documentation MM + dev — vérifier que chaque module/feature de `src/` est couvert dans `docs/missionmaker_guide.md` et `docs/dev-guide.md` ; vérifier que `README.md` couvre toutes les fonctionnalités. Livrables : liste des lacunes + mises à jour des fichiers concernés.
+- ✅ **TODO-DOC-1** : Audit documentation MM + dev — vérifier que chaque module/feature de `src/` est couvert dans `docs/missionmaker_guide.md` et `docs/dev-guide.md` ; vérifier que `README.md` couvre toutes les fonctionnalités. Livrables : liste des lacunes + mises à jour des fichiers concernés.
+  - `docs/dev-guide.md` §12–§19 ajoutés : Zone management, Vehicle system, Beacon, Recon, F10 Menu, Player tracking, AA System, Internal libraries [2026-06-29]
+  - `README.md` : subsection Testing ajoutée avec commandes busted et pointeur vers `tests/` [2026-06-29]
 
 ---
 

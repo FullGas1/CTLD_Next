@@ -1129,6 +1129,19 @@ See [`docs/dev-guide.md`](docs/dev-guide.md) for:
 cd tools/build
 powershell -ExecutionPolicy Bypass -File tools/build/merge_CTLD.ps1
 ```
+
 Output: `CTLD_Next.lua` at repo root.
+
+**Testing:**
+
+```
+# Install busted once (requires lua5.1 + luarocks)
+luarocks install busted
+
+# Run all tests (929 specs, no DCS required)
+busted tests/
+```
+
+Tests live in `tests/unit/` (L1 — unit) and `tests/functional/` (L2 — functional). DCS stubs and module loaders are in `tests/helpers/`. See `docs/dev-guide.md §8` for the full testing guide including Witchcraft live-DCS tests (L3/L4).
 
 **CI:** every push to `master` or `feature_*` branches runs Lua lint, merge build, and busted tests automatically. Every `v*` tag creates a GitHub Release with `CTLD_Next.lua` attached.
