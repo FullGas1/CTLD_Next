@@ -9,7 +9,10 @@ describe("CTLDConfig", function()
     local cfg
 
     before_each(function()
+        CTLDConfig._instance = nil
+        ctld.yamlConfigDatas = nil
         cfg = CTLDConfig.get()
+        cfg:load()
     end)
 
     -- ── Singleton ────────────────────────────────────────────

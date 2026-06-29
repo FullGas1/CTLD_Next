@@ -328,9 +328,9 @@ describe("F-061/F-062 — parachuteVehicle", function()
             assert.is_true(payload.altitude >= 30)
         end)
 
-        it("vehicle state == DELIVERED after parachute", function()
+        it("vehicle state == WAITING after parachute (DELIVERED reserved for full delivery)", function()
             vs:parachuteVehicle(mockTransport, 1001, { unitName="UH-1H-1", groupId=9901, coalition=2 })
-            assert.equals(CTLDVehicle.STATE.DELIVERED, vehicle.state)
+            assert.equals(CTLDVehicle.STATE.WAITING, vehicle.state)
         end)
 
     end)
@@ -383,6 +383,7 @@ describe("F-063/F-064 — canParachuteDrop menu", function()
     end)
 
     local function buildPlayerMenu(capsOverride)
+        CTLDCrateManager.getInstance()  -- register crate menu sections in CTLDPlayerManager
         ctld.gs = function(k)
             if k == "capabilitiesByType" then
                 return { ["UH-1H"] = capsOverride }
@@ -454,6 +455,7 @@ describe("F-065/F-066/F-067 — canSlingload menu", function()
     end)
 
     local function buildSlingMenu(canSlingload, inAir)
+        CTLDCrateManager.getInstance()  -- register crate menu sections in CTLDPlayerManager
         ctld.utils.inAir = function(_) return inAir end
         ctld.gs = function(k)
             if k == "capabilitiesByType" then
@@ -776,7 +778,7 @@ describe("F-070 — releaseSlingload AGL OK", function()
         EventDispatcher.getInstance():subscribe("OnCrateUnloaded", function(p) payload = p end)
         cm:releaseSlingload(mockTransport, { unitName="UH-1H-1", groupId=9901 })
         assert.is_not_nil(payload)
-        assert.equals("slingload_release", payload.trigger)
+        assert.equals("slingload_release", payload.method)
     end)
 
     it("crate.inTransitOnSlingload == false after release", function()
