@@ -1486,8 +1486,12 @@ F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
   - 8 spec files : troop_manager (F-033→036), jtac_manager (F-037→040), parachute (F-057→071),
     utils (F-078→080), config (F-101→105), mark_ids (F-115), vehicle (F-120→123), troop_multi (F-140→146)
   - ~45 tests couverts [2026-06-29]
-- ⬜ **TODO-CI-5** : Étendre `.github/workflows/ci.yml` — job busted sur `tests/unit/` + `tests/functional/`
-- ⬜ **TODO-CI-6** : Documenter la procédure L3/L4 dans `docs/dev-guide.md` §Testing
+- ✅ **TODO-CI-5** : Étendre `.github/workflows/ci.yml` — job busted sur `tests/unit/` + `tests/functional/`
+  - Déjà satisfait : `busted tests/` scanne récursivement avec pattern `_spec` → couvre les deux répertoires
+  - Ajout `workflow_dispatch` pour permettre les runs manuels sans PR [2026-06-29]
+- ✅ **TODO-CI-6** : Documenter la procédure L3/L4 dans `docs/dev-guide.md` §Testing
+  - `docs/dev-guide.md` §8 réécrit : busted, Witchcraft, CTLD.log, debug config, format sortie, cleanup [2026-06-29]
+  - `docs/recette-procedure.md` créé : procédure complète L1→L4 (qui/quand/quoi, ordre, checklist) [2026-06-29]
 
 ---
 
