@@ -1482,7 +1482,10 @@ F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
 - ✅ **TODO-CI-3** : Migrer U-001→U-096 + U-106→U-108 en busted `tests/unit/*_spec.lua` (Option C — réécriture format, pas copie)
   - 21 spec files couvrent l'ensemble du périmètre L1 ; U-022 (getDesc().box) et sondes DCS probes marqués `pending`
   - Correctif loader.lua : `lib/` → `core/` après renommage `src/lib` → `src/core`
-- ⬜ **TODO-CI-4** : Migrer F-* sélectifs (~45) en busted `tests/functional/*_spec.lua`
+- ✅ **TODO-CI-4** : Migrer F-* sélectifs (~45) en busted `tests/functional/*_spec.lua`
+  - 8 spec files : troop_manager (F-033→036), jtac_manager (F-037→040), parachute (F-057→071),
+    utils (F-078→080), config (F-101→105), mark_ids (F-115), vehicle (F-120→123), troop_multi (F-140→146)
+  - ~45 tests couverts [2026-06-29]
 - ⬜ **TODO-CI-5** : Étendre `.github/workflows/ci.yml` — job busted sur `tests/unit/` + `tests/functional/`
 - ⬜ **TODO-CI-6** : Documenter la procédure L3/L4 dans `docs/dev-guide.md` §Testing
 

@@ -74,6 +74,7 @@ Object = {
 
 -- ── trigger ──────────────────────────────────────────────────
 trigger = {
+    smokeColor = { Green = 0, Red = 1, White = 2, Orange = 3, Blue = 4 },
     action = {
         outText           = function() end,
         outTextForGroup   = function() end,
