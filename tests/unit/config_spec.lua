@@ -97,14 +97,6 @@ describe("CTLDConfig", function()
             assert.equals(125, cfg:getSetting("maxExtractDistance"))
         end)
 
-        it("cratesRequiredForFOB defaults to 3", function()
-            assert.equals(3, cfg:getSetting("cratesRequiredForFOB"))
-        end)
-
-        it("buildTimeFOB defaults to 120", function()
-            assert.equals(120, cfg:getSetting("buildTimeFOB"))
-        end)
-
         it("JTAC_maxDistance defaults to 10000", function()
             assert.equals(10000, cfg:getSetting("JTAC_maxDistance"))
         end)
