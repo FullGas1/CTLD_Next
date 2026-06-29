@@ -13,6 +13,7 @@ local function resetAll()
     CTLDZoneManager._instance    = nil
     CTLDTroopManager._instance   = nil
     CTLDVehicleSpawner._instance = nil
+    CTLDCrateManager._instance   = nil   -- resets file-local _cmInstance on next getInstance() call
     _cmInstance                  = nil
     CTLDBeaconManager._instance  = nil
     CTLDReconManager._instance   = nil
@@ -605,6 +606,7 @@ describe("F-068/F-069 — checkHoverStatus", function()
             mockTransport = {
                 isExist     = function() return true end,
                 getName     = function() return "UH-1H-1" end,
+                getTypeName = function() return "UH-1H" end,
                 getPoint    = function() return { x=0, y=109.5, z=0 } end,
                 getVelocity = function() return { x=0, y=0, z=0 } end,
             }
@@ -666,6 +668,7 @@ describe("F-068/F-069 — checkHoverStatus", function()
             mockTransport = {
                 isExist     = function() return true end,
                 getName     = function() return "UH-1H-1" end,
+                getTypeName = function() return "UH-1H" end,
                 getPoint    = function() return { x=0, y=200, z=0 } end,
                 getVelocity = function() return { x=0, y=0, z=0 } end,
             }

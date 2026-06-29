@@ -271,8 +271,11 @@ end
 CTLDCrateManager = class()
 
 local _cmInstance = nil
+CTLDCrateManager._instance = nil  -- class-level mirror for test isolation (reset via CTLDCrateManager._instance = nil)
 
 function CTLDCrateManager.getInstance()
+    -- Support test reset: if class-level _instance was set to nil externally, mirror that to the local var.
+    if CTLDCrateManager._instance == nil then _cmInstance = nil end
     if _cmInstance == nil then
         _cmInstance = setmetatable({}, CTLDCrateManager)
         _cmInstance.crates            = {}   -- [crateName] = CTLDCrate
