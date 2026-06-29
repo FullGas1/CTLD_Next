@@ -10,42 +10,38 @@ on:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # Job 1 — Lua syntax check (all src/**/*.lua)
-  # Uses Lua 5.4 loadfile() as a pure syntax validator.
-  # DCS runs Lua 5.1, but syntax is compatible for this purpose.
+  # Job 1 — Lua 5.1 syntax check (all src/**/*.lua)
+  # Uses luac5.1 -p (parse-only compile) to enforce Lua 5.1 syntax.
+  # This catches constructs invalid in DCS (goto, <<, >>, //, integer
+  # suffixes, etc.) that Lua 5.4 would silently accept.
   # ─────────────────────────────────────────────────────────────
   lua-lint:
-    name: Lua Syntax Check
-    runs-on: windows-latest
+    name: Lua 5.1 Syntax Check
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Lua 5.4
-        run: choco install lua -y --no-progress
-        shell: pwsh
+      - name: Install Lua 5.1
+        run: sudo apt-get install -y lua5.1
 
-      - name: Syntax-check src/
+      - name: Syntax-check src/ with luac5.1
         run: |
-          $failed = 0
-          $total  = 0
-          Get-ChildItem -Path src -Recurse -Filter "*.lua" | ForEach-Object {
-            $total++
-            $path = $_.FullName -replace '\\', '/'
-            # Use [[ ]] long-string to avoid quoting issues with backslashes
-            $result = lua -e "local f,e=loadfile([[$path]]); if e then io.stderr:write(e..'\n'); os.exit(1) end" 2>&1
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "::error file=$($_.FullName)::$result"
-              $failed++
-            }
-          }
-          Write-Host ""
-          if ($failed -gt 0) {
-            Write-Host "::error::$failed / $total Lua file(s) failed syntax check."
+          failed=0
+          total=0
+          while IFS= read -r -d '' f; do
+            total=$((total + 1))
+            if ! luac5.1 -p "$f" 2>/tmp/luac_err; then
+              echo "::error file=$f::$(cat /tmp/luac_err)"
+              failed=$((failed + 1))
+            fi
+          done < <(find src -name "*.lua" -print0)
+          echo ""
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::$failed / $total Lua file(s) failed Lua 5.1 syntax check."
             exit 1
-          }
-          Write-Host "Syntax OK — $total Lua file(s) checked."
-        shell: pwsh
+          fi
+          echo "Lua 5.1 syntax OK — $total file(s) checked."
 
   # ─────────────────────────────────────────────────────────────
   # Job 2 — Merge build (produces CTLD_Next.lua)
