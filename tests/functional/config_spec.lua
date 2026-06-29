@@ -6,7 +6,7 @@
 
 -- Resolve repo root to dofile i18n language files
 local _thisFile = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]functional[\\/]")
-assert(_thisFile, "config_spec: cannot resolve repo root")
+if not _thisFile then _thisFile = "" end  -- relative path: cwd is repo root
 
 -- Load extra language dictionaries (not in default loader)
 dofile(_thisFile .. "src/CTLD_i18n_fr.lua")
