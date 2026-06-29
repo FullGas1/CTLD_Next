@@ -5,9 +5,14 @@
 -- 2. Loads all CTLD src/ modules (idempotent via _CTLD_LOADED guard in loader.lua).
 -- ============================================================
 
--- Resolve repo root from this file's path
+-- Resolve repo root from this file's path.
+-- Absolute path  →  capture everything before "tests/helpers/init.lua"
+-- Relative path  →  busted was invoked from the repo root, so root = ""
 local _thisFile = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]helpers[\\/]init%.lua$")
-assert(_thisFile, "init.lua: cannot resolve repo root")
+if not _thisFile then
+  -- Relative source (e.g. "@tests/helpers/init.lua") — cwd IS the repo root
+  _thisFile = ""
+end
 
 -- Load DCS stubs first (globals must exist before src/ modules load)
 dofile(_thisFile .. "tests/helpers/dcs_stubs.lua")
