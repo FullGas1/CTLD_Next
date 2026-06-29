@@ -1477,7 +1477,7 @@ F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
 
 ### TODOs
 
-- ⬜ **TODO-CI-1** : Déplacer les ~35 `diag_*` de `live_tests/` racine → `live_tests/dev/diag/`
+- ✅ **TODO-CI-1** : Déplacer les ~35 `diag_*` de `live_tests/` racine → `live_tests/dev/diag/`
 - ✅ **TODO-CI-2** : Créer `tests/unit/` + `tests/functional/` + ajuster `.busted` pour scanner ces dossiers
 - ✅ **TODO-CI-3** : Migrer U-001→U-096 + U-106→U-108 en busted `tests/unit/*_spec.lua` (Option C — réécriture format, pas copie)
   - 21 spec files couvrent l'ensemble du périmètre L1 ; U-022 (getDesc().box) et sondes DCS probes marqués `pending`
