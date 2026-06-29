@@ -18,7 +18,7 @@ ctld.debug  = false
 ctldLogPath = (os.getenv("TEMP") or os.getenv("TMP") or "/tmp") .. "/"
 
 -- ── Core foundations ──────────────────────────────────────────
-dofile(SRC .. "lib/class.lua")
+dofile(SRC .. "core/class.lua")
 dofile(SRC .. "CTLD_config.lua")
 
 -- Minimal i18n stub so ctld.tr() is available before CTLD_i18n loads
@@ -29,8 +29,8 @@ dofile(SRC .. "CTLD_utils.lua")
 dofile(SRC .. "CTLD_i18n.lua")
 dofile(SRC .. "CTLD_i18n_en.lua")
 dofile(SRC .. "CTLD_menu.lua")
-dofile(SRC .. "lib/CTLD_objectRegistry.lua")
-dofile(SRC .. "lib/CTLDParachuteEffect.lua")
+dofile(SRC .. "core/CTLD_objectRegistry.lua")
+dofile(SRC .. "core/CTLDParachuteEffect.lua")
 
 -- ── Business domain managers ──────────────────────────────────
 dofile(SRC .. "CTLD_sceneManager.lua")
