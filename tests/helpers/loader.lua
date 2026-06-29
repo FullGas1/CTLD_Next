@@ -7,9 +7,10 @@
 if _CTLD_LOADED then return end
 _CTLD_LOADED = true
 
--- Resolve repo root: two levels up from this file (tests/helpers/loader.lua)
+-- Resolve repo root: two levels up from this file (tests/helpers/loader.lua).
+-- Relative source (busted invoked from repo root) → root = ""
 local _src = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]helpers[\\/]loader%.lua$")
-assert(_src, "loader.lua: cannot resolve repo root from path")
+if not _src then _src = "" end
 local SRC = _src .. "src/"
 
 -- ── Silence the log file (write to OS temp dir, not live_tests/) ──
