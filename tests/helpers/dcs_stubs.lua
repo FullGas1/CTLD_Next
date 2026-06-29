@@ -90,7 +90,11 @@ trigger = {
         smoke             = function() end,
         illuminationBomb  = function() end,
         explosion         = function() end,
-        setUnitInternalCargo = function() end,
+        setUnitInternalCargo      = function() end,
+        outSoundForCoalition      = function() end,
+        outSoundForGroup          = function() end,
+        outSoundForUnit           = function() end,
+        outSound                  = function() end,
     },
     misc = {
         getZone = function(name) return nil end,

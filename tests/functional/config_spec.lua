@@ -203,7 +203,7 @@ end)
 describe("CTLDi18n F-105 — ES and KO completeness audit", function()
 
     -- Load KO dict if not already loaded
-    before_all(function()
+    setup(function()
         if not (ctld.i18n and ctld.i18n["ko"]) then
             dofile(_thisFile .. "src/CTLD_i18n_ko.lua")
         end
