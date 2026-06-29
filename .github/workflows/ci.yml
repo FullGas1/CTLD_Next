@@ -113,21 +113,18 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   busted:
     name: busted Tests
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Lua + LuaRocks + busted
         run: |
-          choco install lua -y --no-progress
-          choco install luarocks -y --no-progress
-          luarocks install busted
-        shell: pwsh
+          sudo apt-get install -y lua5.1 liblua5.1-dev luarocks
+          sudo luarocks install busted
 
       - name: Run busted
         run: busted tests/
-        shell: pwsh
 
   # ─────────────────────────────────────────────────────────────
   # Job 4 — MkDocs deploy to GitHub Pages (master branch only)
