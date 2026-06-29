@@ -1182,10 +1182,10 @@ Minor cleanups identified — low priority, no functional impact.
 - **POST-PROJECT** Mise à jour specs techniques (`docs/specs/`)
   Une fois le projet finalisé : relire tous les fichiers de `docs/specs/` et les mettre à jour pour refléter le code implémenté (Feature Q, Feature O, CL-9/10, capabilitiesByType, menu order, etc.). Objectif : faciliter la maintenance future en ayant des specs conformes au code livré.
 
-- **CL-12** Refonte README
-  • Vérifier que tous les exemples de fonctions/méthodes présents dans le README actuel sont bien implémentés dans `CTLD_Next.lua`
-  • Réécrire le README pour qu'il corresponde à la dernière version du code (v2) ; chaque exemple doit décrire l'ensemble des paramètres attendus lors des appels de méthodes
-  • Documenter la possibilité de définir des zones via des conventions de nommage DCS (préfixes TRZ_, LGZ_, WPZ_, EXZ_, etc.) et en détailler la structure exacte (la notion d'extractZone n'est pas encore documentée dans le README)
+- ~~**CL-12**~~ ✅ Refonte README [2026-06-29]
+  Toutes sections v2 documentées : capabilitiesByType, zone naming conventions (TRZ_/LGZ_/WPZ_),
+  extract zones (TRZ_ stock=0), AI zones, extractableGroups, all scripting API avec paramètres complets.
+  Fix : lien README_old.md cassé remplacé par anchor interne #migration-from-v1.
 
 ---
 
