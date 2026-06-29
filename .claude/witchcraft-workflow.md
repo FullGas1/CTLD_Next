@@ -103,8 +103,8 @@ Get-Content "C:\Users\Moi\Documents\GitHub\DCS-CTLD_FG\recette\CTLD.log"
 
 Chemins :
 ```
-CTLD.log  →  {ctldLogPath}CTLD.log       (ex: recette/CTLD.log)
-diag.log  →  recette/diag.log
+CTLD.log  →  {ctldLogPath}CTLD.log       (ex: live_tests/CTLD.log)
+diag.log  →  live_tests/diag.log
 DCS.log   →  %USERPROFILE%\Saved Games\DCS\Logs\DCS.log
 ```
 
@@ -113,7 +113,7 @@ DCS.log   →  %USERPROFILE%\Saved Games\DCS\Logs\DCS.log
 ## Workflow recette complet — 7 étapes
 
 ```
-1. CRÉER     copier _template_scenario.lua → recette/scenarios/scenario_<nom>.lua
+1. CRÉER     copier _template_scenario.lua → live_tests/scenarios/scenario_<nom>.lua
              remplacer SCENARIO_TAG partout
 
 2. CONFIG    ctldLogPath défini dans le .miz (trigger MISSION START → DO SCRIPT FILE)
@@ -136,7 +136,7 @@ DCS.log   →  %USERPROFILE%\Saved Games\DCS\Logs\DCS.log
              Get-Content "recette\CTLD.log" | Select-String "[mon_tag]"
 ```
 
-**Script d'attente** : `recette/wait_ctld_ready.lua` — injecter si CTLDTroopManager n'est pas encore disponible.
+**Script d'attente** : `live_tests/wait_ctld_ready.lua` — injecter si CTLDTroopManager n'est pas encore disponible.
 
 ---
 
@@ -156,7 +156,7 @@ Modif  →  Rebuild (si src/)  →  Injection  →  Lecture CTLD.log  →  Itér
 
 ## Template scenario — structure obligatoire
 
-Tout nouveau scenario est créé depuis `recette/scenarios/_template_scenario.lua`.
+Tout nouveau scenario est créé depuis `live_tests/scenarios/_template_scenario.lua`.
 
 **Points clés du template :**
 
@@ -207,7 +207,7 @@ _G["_MON_TAG_STEP"] = nil  -- reset
 
 **Reset de tous les compteurs** (scenario planté) :
 ```bash
-node bridge.js "recette/_reset_steps.lua"
+node bridge.js "live_tests/_reset_steps.lua"
 # → "[RESET_STEPS] Cleared N step counter(s): _MON_TAG_STEP, ..."
 ```
 

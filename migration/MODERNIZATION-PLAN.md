@@ -73,7 +73,7 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
          Old recette: 8/8  100% [2026-04-07] (basic lifecycle — PRE-refactor)
          Refactor done [2026-05-02]: terminologie + états rename + _aliveUnits/_jtacUnits +
          S_EVENT_DEAD sync + deregisterJTAC × N + multi-JTAC + orphan cleanup
-         New recette: `recette/scenarios/scenarioTroopsFullCycle_v2.lua` (8 steps) — ✅ 8/8 PASS [2026-05-04]
+         New recette: `live_tests/scenarios/scenarioTroopsFullCycle_v2.lua` (8 steps) — ✅ 8/8 PASS [2026-05-04]
          Re-validated: startLaseTroopUnit unit-keyed path — ✅ 8/8 PASS [2026-05-04]
          Validated: BUG-02 (wasJtac before _removeDeadUnit), BUG-03 (_syncFromDCSGroup real DCS names), BUG-04/06/07/08
          ✅ BUGFIX: menu "Load from X" — (A) libellé [2026-05-04]
@@ -364,7 +364,7 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
         DCS réelle et valident le comportement observable de bout en bout.
 
         Architecture :
-          • Répertoire : recette/scenarios/ (séparé des diag/)
+          • Répertoire : live_tests/scenarios/ (séparé des diag/)
           • Chaque scénario = script Lua autonome injectable via Witchcraft
           • Mode d'exécution : mission lancée en mode CTLD debug (ctld.debug = true)
           • Tous les messages outText envoyés à l'écran doivent AUSSI être insérés dans CTLD.log
@@ -448,7 +448,7 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
           ✅ (A+B) `ctld.scheduler` (CTLD_utils.lua) : registre central register/cancel/cancelAll
           ✅ beacon refresh loop : return-t+interval + guard B (zombie auto-stop) + register "beacon_refresh"
           ✅ AI transport loop : guard B + register "ai_transport"
-          ✅ recette/shutdown_ctld.lua : script Witchcraft → ctld.scheduler.cancelAll() avant réinjection
+          ✅ live_tests/shutdown_ctld.lua : script Witchcraft → ctld.scheduler.cancelAll() avant réinjection
         Vérifié live DCS : cancelAll annule 2 boucles (beacon_refresh + ai_transport) ✅
         Note : l'item "CTLDCoreManager:shutdown()" du backlog est couvert par ctld.scheduler.cancelAll()
                → aucun wrapper shutdown() séparé nécessaire
@@ -659,7 +659,7 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
           ✅ F-125 : baseline JTAC vehicle load/setJTACInTransit — 10/10 PASS [2026-05-06]
           ✅ F-126 : GAP-K1 parachuteVehicle → WAITING + resumeJTAC — 4/4 PASS [2026-05-06]
           ✅ F-127 : GAP-K2 transport destroy → deregisterJTAC + purge — 5/5 PASS [2026-05-06]
-          Scénario : recette/scenarios/scenario_feature_k_jtac_vehicle.lua (4/4 steps ALL SUCCESS)
+          Scénario : live_tests/scenarios/scenario_feature_k_jtac_vehicle.lua (4/4 steps ALL SUCCESS)
 
         Sprint 2a — bbox crates (GAP-K3 Flow 1) [2026-05-06] :
           ✅ _checkNativeDCSCargo refactorisé : _nativeCrateLink {lx,ly,lz} remplace _nativeLoadDist
@@ -710,7 +710,7 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
         Recette :
           ✅ F-140→F-146 : 22/22 PASS [2026-05-12] — menu direct/sous-menu disembark, disembarkAll/Index,
              _menuCheckCargo multi-ligne+TOTAL, extract 1/N groupes avec distances
-          ✅ MT-01 : test manuel 10 étapes PASS live DCS [2026-05-12] (recette/manual_test_sequences.md)
+          ✅ MT-01 : test manuel 10 étapes PASS live DCS [2026-05-12] (live_tests/manual_test_sequences.md)
           ✅ MT-02 : test manuel véhicule entier PASS live DCS [2026-05-12] — bug fix: message confirmation parachutage manquant (parachuteVehicle)
           ✅ MT-03 : test manuel multi-vehicle entier PASS live DCS [2026-05-12] — bugs fixed: inAir guard load closure + refreshLoadSection absent de onTakeoff/onLand
           ✅ MT-04 : test manuel combinaison crate + troops PASS live DCS [2026-05-13] — bug fix: message confirmation parachutage crates manquant (parachuteCrates)
@@ -736,7 +736,7 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
              (si `allowRandomAiTeamPickups`) ou first-available ; dropoff : `getDropoffZoneAt` + `disembarkAll`.
           ✅ `allowRandomAiTeamPickups` gate : random si true, sinon premier template disponible.
           ✅ pcall par unité, log WARN sur erreur.
-        Recette : `recette/scenarios/scenario_ai_transport.lua` — F-133 (_aiTeams), F-134 (pickup/dropoff).
+        Recette : `live_tests/scenarios/scenario_ai_transport.lua` — F-133 (_aiTeams), F-134 (pickup/dropoff).
 
 ✅  FG  Feature O — Extractable groups (INIT-E) [2026-05-19]
         Objectif : porter le legacy `extractableGroups` — groupes DCS placés par le MM extractibles via F10.
@@ -1104,7 +1104,7 @@ Rules: all player-visible strings use `ctld.tr()`. Key added to EN first, propag
 | Feature C (MM crate) | ✅ | ✅ | ✅ | 100% | registerMMCrate + OnMMCrateDetected, F-41 PASS [2026-04-07] |
 | Feature D (LoadableGroups) | ✅ | ✅ | ✅ | 100% | U-76→U-80 + F-88→F-89, 102/102 PASS [2026-04-14] |
 | Feature E (CTLD log) | ✅ | ✅ | ✅ | 100% | initLog/log/closeLog dans CTLD_utils.lua — validé via utils recette M9 [2026-04-09] |
-| **Troop + JTAC Lifecycle** (`src/CTLD_troop.lua`) | ✅ impl | ✅ spec | ✅ 8/8 | 100% | ✅ Terminologie rename + États rename + _aliveUnits/_jtacUnits + S_EVENT_DEAD sync + deregisterJTAC × N + multi-JTAC N× + orphan cleanup [2026-05-02]. Recette: `recette/scenarios/scenarioTroopsFullCycle_v2.lua` 8/8 PASS [2026-05-04] |
+| **Troop + JTAC Lifecycle** (`src/CTLD_troop.lua`) | ✅ impl | ✅ spec | ✅ 8/8 | 100% | ✅ Terminologie rename + États rename + _aliveUnits/_jtacUnits + S_EVENT_DEAD sync + deregisterJTAC × N + multi-JTAC N× + orphan cleanup [2026-05-02]. Recette: `live_tests/scenarios/scenarioTroopsFullCycle_v2.lua` 8/8 PASS [2026-05-04] |
 | **Mise en conformité scénarios recette** | ✅ template | — | ⬜ 0% | — | Reformater tous les scénarios existants (`scenario_*.lua`, `scenarioTroopsFullCycle_A.lua`, etc.) pour conformité au nouveau template (pcall, check/assert, fail+traceback, log reset step 1, timer, return TAG+step+SUCCESS) — ⬜ pending [2026-05-04] |
 
 ---
@@ -1411,10 +1411,10 @@ Minor cleanups identified — low priority, no functional impact.
 | --- | --- | --- | --- | --- |
 | **L1** | Busted unit | `tests/unit/` | CI automatique (GitHub Actions) | busted, dcs_stubs.lua |
 | **L2** | Busted functional | `tests/functional/` | CI automatique (GitHub Actions) | busted, dcs_stubs.lua |
-| **L3** | Witchcraft auto | `recette/scenarios/auto/` | Manuel + mission DCS headless (pas de joueur) | Witchcraft inject + CTLD.log |
-| **L4** | Witchcraft interactif | `recette/scenarios/interactive/` | Manuel + mission DCS + joueur humain | Witchcraft inject + F10 menu |
+| **L3** | Witchcraft auto | `live_tests/scenarios/auto/` | Manuel + mission DCS headless (pas de joueur) | Witchcraft inject + CTLD.log |
+| **L4** | Witchcraft interactif | `live_tests/scenarios/interactive/` | Manuel + mission DCS + joueur humain | Witchcraft inject + F10 menu |
 
-> Les fichiers `recette/unit/` (U-*) et `recette/functional/` (F-*) au format Witchcraft restent comme **référence de couverture** — ils documentent ce qui doit être testé. Les `tests/unit/` et `tests/functional/` en sont l'implémentation CI.
+> Les fichiers `live_tests/unit/` (U-*) et `live_tests/functional/` (F-*) au format Witchcraft restent comme **référence de couverture** — ils documentent ce qui doit être testé. Les `tests/unit/` et `tests/functional/` en sont l'implémentation CI.
 
 ### Structure cible `tests/`
 
@@ -1459,10 +1459,10 @@ F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
 
 1. Lancer DCS en mode serveur/éditeur avec la mission de test `missions/Test_CTLDNEXT_01.miz`
 2. Activer Witchcraft (mission start)
-3. Injecter `recette/shutdown_ctld.lua` si CTLD déjà actif
+3. Injecter `live_tests/shutdown_ctld.lua` si CTLD déjà actif
 4. Injecter `CTLD_Next.lua` (après rebuild si src/ modifié)
 5. Attendre 3–5 s (init CTLD)
-6. Injecter le scénario `recette/scenarios/auto/scenario_xxx.lua`
+6. Injecter le scénario `live_tests/scenarios/auto/scenario_xxx.lua`
 7. Lire `CTLD.log` : chercher `[PASS]` / `[FAIL]` / `[SUCCESS]`
 8. En cas d'échec : analyser le log, corriger, rebuildere et recommencer depuis l'étape 3
 
@@ -1478,7 +1478,7 @@ F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
 
 ### TODOs
 
-- ⬜ **TODO-CI-1** : Déplacer les ~35 `diag_*` de `recette/` racine → `recette/dev/diag/`
+- ⬜ **TODO-CI-1** : Déplacer les ~35 `diag_*` de `live_tests/` racine → `live_tests/dev/diag/`
 - ⬜ **TODO-CI-2** : Créer `tests/unit/` + `tests/functional/` + ajuster `.busted` pour scanner ces dossiers
 - ⬜ **TODO-CI-3** : Migrer U-001→U-096 en busted `tests/unit/*_spec.lua` (Option C — réécriture format, pas copie)
 - ⬜ **TODO-CI-4** : Migrer F-* sélectifs (~45) en busted `tests/functional/*_spec.lua`

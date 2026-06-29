@@ -2126,7 +2126,7 @@ end
 --   local fid = timer.scheduleFunction(myLoop, nil, timer.getTime() + 5)
 --   ctld.scheduler.register("my_loop_name", fid)
 --
--- Shutdown (inject recette/shutdown_ctld.lua before re-injecting CTLD_Next):
+-- Shutdown (inject live_tests/shutdown_ctld.lua before re-injecting CTLD_Next):
 --   ctld.scheduler.cancelAll()
 -- ============================================================
 

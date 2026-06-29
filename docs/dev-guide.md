@@ -14,7 +14,7 @@ tools/
 tests/            busted unit tests (no DCS required)
   helpers/        DCS stubs + module loader
   specs/          *_spec.lua test files
-recette/          Witchcraft integration tests (requires live DCS mission)
+live_tests/          Witchcraft integration tests (requires live DCS mission)
 docs/             This guide + missionmaker_guide.md + specs/
 assets/           Audio files (beacon.ogg)
 missions/         Demo and test .miz files
@@ -341,9 +341,9 @@ Requires `luarocks install busted`.
 
 **Witchcraft (integration, requires live DCS mission):**
 ```
-node "%USERPROFILE%/.vscode-dcs-tools/bridge.js" "C:/path/to/recette/F-xx/test.lua"
+node "%USERPROFILE%/.vscode-dcs-tools/bridge.js" "C:/path/to/live_tests/F-xx/test.lua"
 ```
-Results in `recette/CTLD.log`.
+Results in `live_tests/CTLD.log`.
 
 ---
 

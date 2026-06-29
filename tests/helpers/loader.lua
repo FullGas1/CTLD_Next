@@ -12,7 +12,7 @@ local _src = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]helpers[\\/]loa
 assert(_src, "loader.lua: cannot resolve repo root from path")
 local SRC = _src .. "src/"
 
--- ── Silence the log file (write to OS temp dir, not recette/) ──
+-- ── Silence the log file (write to OS temp dir, not live_tests/) ──
 ctld = ctld or {}
 ctld.debug  = false
 ctldLogPath = (os.getenv("TEMP") or os.getenv("TMP") or "/tmp") .. "/"

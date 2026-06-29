@@ -51,7 +51,7 @@
 - **Echo écran** : `cfg.settings["debugScreenLog"] = true` active l'echo écran de tous les `ctld.utils.log()`. Durée : `cfg.settings["debugScreenLogDuration"]` (défaut 10 s).
 - **Rebuild** : si `src/` modifié → toujours rebuilder avant injection : `powershell -ExecutionPolicy Bypass -File "tools\merger_V2\merge_CTLD.ps1"`
 - **Délai init** : attendre 3–5 secondes après injection de `CTLD_Next.lua` avant d'injecter un scenario (initialisation CTLD).
-- **Template obligatoire** : tout nouveau scenario est créé depuis `recette/scenarios/_template_scenario.lua` (banner début avec timestamp, pcall cleanup, return Witchcraft).
+- **Template obligatoire** : tout nouveau scenario est créé depuis `live_tests/scenarios/_template_scenario.lua` (banner début avec timestamp, pcall cleanup, return Witchcraft).
 - **Cycle autonome** : c'est l'IA qui réinjecte et lit CTLD.log à chaque itération — ne jamais attendre l'utilisateur entre deux injections.
 - **Cleanup garanti** : wraper le step machine dans `pcall` → `cfg.settings["debug"] = _saved_debug` toujours exécuté même si `fail()` lance une erreur.
 
@@ -59,7 +59,7 @@
 
 - **Après chaque recette terminée**, mettre à jour **obligatoirement** dans la même réponse :
   1. `.github/MODERNIZATION-PLAN.md` — passer le statut (⚪/❓ → ✅) et mettre à jour le tableau Module completion status
-  2. `recette/recette.md` — ajouter les lignes U-xx/F-xx dans les tableaux, mettre à jour le Résumé de couverture (Total inclus), rayer l'entrée "Recettes restantes" si couverte
+  2. `live_tests/recette.md` — ajouter les lignes U-xx/F-xx dans les tableaux, mettre à jour le Résumé de couverture (Total inclus), rayer l'entrée "Recettes restantes" si couverte
 
 - **Standards obligatoires dans chaque script de recette** :
   - `ctld_test.cleanup()` en tête de chaque test fonctionnel (F-xx)
