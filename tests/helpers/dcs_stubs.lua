@@ -109,9 +109,11 @@ missionCommands = {
 
 -- ── world ────────────────────────────────────────────────────
 world = {
-    searchObjects = function(cat, vol, fn) end,
-    VolumeType    = { SPHERE = 0, BOX = 4 },
-    event         = {},
+    searchObjects   = function(cat, vol, fn) end,
+    addEventHandler = function(handler) end,
+    removeEventHandler = function(handler) end,
+    VolumeType      = { SPHERE = 0, BOX = 4 },
+    event           = {},
 }
 
 -- ── land ─────────────────────────────────────────────────────
