@@ -49,7 +49,7 @@
 - **Debug** : utiliser **`cfg.settings["debug"] = true`** — jamais `ctld.debug = true` (insuffisant, n'active pas CTLD.log).
 - **`ctldLogPath`** : doit être défini dans le `.miz` de test (trigger MISSION START) pour que CTLD.log soit créé. Chemin local, jamais commité.
 - **Echo écran** : `cfg.settings["debugScreenLog"] = true` active l'echo écran de tous les `ctld.utils.log()`. Durée : `cfg.settings["debugScreenLogDuration"]` (défaut 10 s).
-- **Rebuild** : si `src/` modifié → toujours rebuilder avant injection : `powershell -ExecutionPolicy Bypass -File "tools\merger_V2\merge_CTLD.ps1"`
+- **Rebuild** : si `src/` modifié → toujours rebuilder avant injection : `powershell -ExecutionPolicy Bypass -File "tools\build\merge_CTLD.ps1"`
 - **Délai init** : attendre 3–5 secondes après injection de `CTLD_Next.lua` avant d'injecter un scenario (initialisation CTLD).
 - **Template obligatoire** : tout nouveau scenario est créé depuis `live_tests/scenarios/_template_scenario.lua` (banner début avec timestamp, pcall cleanup, return Witchcraft).
 - **Cycle autonome** : c'est l'IA qui réinjecte et lit CTLD.log à chaque itération — ne jamais attendre l'utilisateur entre deux injections.

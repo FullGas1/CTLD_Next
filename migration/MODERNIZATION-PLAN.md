@@ -9,7 +9,7 @@
 
 Rewrite CTLD as a modern, modular, and testable Lua project while
 preserving backward compatibility with existing missions.
-Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
+Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 
 ---
 
@@ -17,14 +17,14 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
 
 | # | Topic | Decision |
 | - | ----- | -------- |
-| 1 | Module split | ✅ **Done** — `src/` files concatenated → `CTLD_Next.lua` by `tools/merger_V2/merge_CTLD.ps1`. Order: `tools/merger_V2/listToMerge.txt` |
+| 1 | Module split | ✅ **Done** — `src/` files concatenated → `CTLD_Next.lua` by `tools/build/merge_CTLD.ps1`. Order: `tools/build/listToMerge.txt` |
 | 2 | OOP | ✅ **Done** — `src/lib/class.lua` created (P1). All entity classes refactored. |
 | 3 | MIST | ✅ **Done** — all `mist.*` calls replaced by `ctld.utils.*`. No active `mist.*` call in `src/` |
 | 4 | Legacy API | ✅ **Done** — `src/compat/legacy_api.lua` (22 wrappers, thin delegates) [2026-04-15] |
 | 5 | Lua env | Lua 5.1 DCS sandbox, desanitized server (`io`, `os`, `lfs` accessible) |
 | 6 | Testing | ✅ **Done** — busted infrastructure in `tests/helpers/` + `tests/specs/` + CI job [2026-04-15] |
 | 7 | Docs | ✅ **Done** — `docs/missionmaker_guide.md` (§1–16) + `docs/dev-guide.md` [2026-04-15] |
-| 8 | i18n | ✅ **Done** — `src/CTLD_i18n*.lua` (EN/FR/ES/KO), `ctld.tr()` at all sites, generator `tools/merger_V2/generate_i18n_dicts.ps1` |
+| 8 | i18n | ✅ **Done** — `src/CTLD_i18n*.lua` (EN/FR/ES/KO), `ctld.tr()` at all sites, generator `tools/build/generate_i18n_dicts.ps1` |
 | 9 | Branching | Feature branches `feature/<description>`. `master` stays stable |
 | 10 | Events | ✅ **Done** — 38 CTLD events specified. EventDispatcher ✅. CTLDDCSEventBridge ✅. StateManager + Coalition supprimés (absorbés par managers). C1 impl ✅ [2026-04-02]. |
 | 11 | Scenes | ✅ **Done** — `src/scenes/` (9 files). Auto-register via `CTLDSceneManager.getInstance():registerSceneModel(...)` |
@@ -871,11 +871,11 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
         Triggers : push sur master + feature_* , PR vers master
 ✅  Q4a Réorganisation arborescence repo  [2026-04-15]
         Suppressions : old/, merger/ (V1), src/tests/, conversation.text, witchcraft_test.lua
-        Déplacements : merger_V2/ → tools/merger_V2/, CTLD_loader.lua → tools/,
+        Déplacements : build/ → tools/build/, CTLD_loader.lua → tools/,
           documentation/ + Specs/ → docs/, *.ogg → assets/, *.png → docs/,
           *.miz → missions/, CTLD.lua (v1) → source/
         .gitignore : ajout CTLD_Next.lua
-        ci.yml : chemin corrigé tools/merger_V2/listToMerge.txt
+        ci.yml : chemin corrigé tools/build/listToMerge.txt
 ✅  Q4b source/ dead code cleanup  [2026-04-16]
         Supprimés : CTLD_beacon.lua, CTLD_config.lua, CTLD_core.lua, CTLD_i18n.lua,
           CTLD_jtac.lua, CTLD_menu.lua, CTLD_recon.lua, CTLD_utils.lua, load_event.lua
@@ -933,10 +933,10 @@ Deliverable: single `.lua` file produced by `tools/merger_V2/merge_CTLD.ps1`.
 
 ### 0.4 — Build infrastructure ✅
 
-- `tools/merger_V2/merge_CTLD.ps1`: concatenates `src/` → `CTLD_Next.lua`
-- `tools/merger_V2/listToMerge.txt`: canonical load order
-- `tools/merger_V2/generate_loader.ps1`: generates `CTLD_loader.lua` for dev
-- `tools/merger_V2/generate_i18n_dicts.ps1`: syncs i18n keys across languages
+- `tools/build/merge_CTLD.ps1`: concatenates `src/` → `CTLD_Next.lua`
+- `tools/build/listToMerge.txt`: canonical load order
+- `tools/build/generate_loader.ps1`: generates `CTLD_loader.lua` for dev
+- `tools/build/generate_i18n_dicts.ps1`: syncs i18n keys across languages
 
 ---
 
@@ -1042,12 +1042,12 @@ Each wrapper logs a deprecation warning and delegates to the v2 manager.
 
 | Task | Status | Detail |
 | ---- | ------ | ------ |
-| 6.1 | ✅ Done | `tools/merger_V2/merge_CTLD.ps1` → `CTLD_Next.lua` |
+| 6.1 | ✅ Done | `tools/build/merge_CTLD.ps1` → `CTLD_Next.lua` |
 | 6.2 | ✅ Done | GitHub Actions — run busted tests [2026-04-15] |
 | 6.3 | ✅ Done | GitHub Actions — build `CTLD_Next.lua` on push [2026-04-15] |
 | 6.4 | ✅ Done | GitHub Actions — release artifact on tag `v*` → GitHub Release + CTLD_Next.lua [2026-04-16] |
 | 6.5 | ✅ Done | GitHub Actions — MkDocs deploy to GitHub Pages (push master → gh-pages) [2026-04-16] |
-| 6.6 | ✅ Done | i18n lint: `tools/merger_V2/generate_i18n_dicts.ps1` |
+| 6.6 | ✅ Done | i18n lint: `tools/build/generate_i18n_dicts.ps1` |
 
 ---
 
@@ -1060,7 +1060,7 @@ Each wrapper logs a deprecation warning and delegates to the v2 manager.
 | `src/CTLD_i18n_fr.lua` | French translations |
 | `src/CTLD_i18n_es.lua` | Spanish translations |
 | `src/CTLD_i18n_ko.lua` | Korean translations |
-| `tools/merger_V2/generate_i18n_dicts.ps1` | Key sync — detects drift between languages |
+| `tools/build/generate_i18n_dicts.ps1` | Key sync — detects drift between languages |
 
 Rules: all player-visible strings use `ctld.tr()`. Key added to EN first, propagated by generator.
 

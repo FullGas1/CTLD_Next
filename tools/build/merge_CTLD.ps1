@@ -1,7 +1,7 @@
 # merge_CTLD.ps1 - Local build script for CTLD_Next.lua
 # Output: UTF-8 WITHOUT BOM (required by DCS Lua engine).
 # Compatible with PowerShell 5 and 7.
-# Usage: powershell -ExecutionPolicy Bypass -File tools/merger_V2/merge_CTLD.ps1
+# Usage: powershell -ExecutionPolicy Bypass -File tools/build/merge_CTLD.ps1
 
 $ErrorActionPreference = "Stop"
 

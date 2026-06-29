@@ -399,10 +399,9 @@ Overrides are applied at startup on top of the built-in dictionaries. You can ov
 ### Adding a new language
 
 1. Create `src/CTLD_i18n_XX.lua` following the English file as a template.
-2. Add `CTLD_i18n_XX.lua` to `merger_V2/listToMerge.txt` (after the other dict files).
-3. Rerun `powershell -ExecutionPolicy Bypass -File tools/merger_V2/generate_loader.ps1` to update the dev loader.
-4. Activate the new language in `CTLD_i18n.lua`.
-5. Run `merger_V2/generate_i18n_dicts.ps1` to check for missing keys.
+2. Add `CTLD_i18n_XX.lua` to `tools/build/listToMerge.txt` (after the other dict files).
+3. Activate the new language in `CTLD_i18n.lua`.
+4. Run `tools/build/generate_i18n_dicts.ps1` to check for missing keys.
 
 ---
 

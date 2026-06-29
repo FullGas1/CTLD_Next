@@ -22,9 +22,9 @@
 #   STALE keys    -> line prefixed with "-- STALE:" (not deleted — confirm manually)
 #   version bump  -> each modified dict gets its own version incremented
 #
-# Usage (from repo root or from merger_V2/):
-#   .\merger_V2\generate_i18n_dicts.ps1           # dry-run
-#   .\merger_V2\generate_i18n_dicts.ps1 -Apply    # apply
+# Usage (from repo root or from build/):
+#   .\build\generate_i18n_dicts.ps1           # dry-run
+#   .\build\generate_i18n_dicts.ps1 -Apply    # apply
 
 param(
     [switch]$Apply,

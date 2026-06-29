@@ -876,8 +876,8 @@ CTLDSceneManager.getInstance():registerSceneModel(xxxScene)
 
 ##### Checklist post-création
 
-1. Ajouter `scenes/CTLD_xxxScene.lua` dans `tools/merger_V2/listToMerge.txt` **avant** `CTLD_core.lua`
-2. Rebuild : `powershell -ExecutionPolicy Bypass -File "tools\merger_V2\merge_CTLD.ps1"`
+1. Ajouter `scenes/CTLD_xxxScene.lua` dans `tools/build/listToMerge.txt` **avant** `CTLD_core.lua`
+2. Rebuild : `powershell -ExecutionPolicy Bypass -File "tools\build\merge_CTLD.ps1"`
 3. Aucune modification dans : `CTLD_config.lua`, `CTLD_i18n_*.lua`, `CTLD_sceneManager.lua`, `CTLD_crate.lua`
 
 ---
@@ -1189,7 +1189,7 @@ Récapitulatif des paginations :
 
 ## 6. Système de build
 
-**Répertoire** : `merger_V2/`
+**Répertoire** : `build/`
 
 | Fichier | Rôle |
 |---|---|

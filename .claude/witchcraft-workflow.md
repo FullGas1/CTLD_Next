@@ -122,7 +122,7 @@ DCS.log   →  %USERPROFILE%\Saved Games\DCS\Logs\DCS.log
 3. MODIFIER  modifier src/ si besoin
 
 4. REBUILD   si src/ modifié :
-             powershell -ExecutionPolicy Bypass -File "tools\merger_V2\merge_CTLD.ps1"
+             powershell -ExecutionPolicy Bypass -File "tools\build\merge_CTLD.ps1"
 
 5. INJECTER  CTLD_Next.lua :
              node bridge.js "C:\...\CTLD_Next.lua"

@@ -9,7 +9,7 @@ src/              Source modules (OOP, one class per file)
   compat/         Legacy v1 API wrappers (thin delegates, deprecated)
 source/           Reference — original monolithic v1 CTLD.lua (read-only)
 tools/
-  merger_V2/      Build tooling: merge src/ → CTLD_Next.lua
+  merger/      Build tooling: merge src/ → CTLD_Next.lua
   CTLD_loader.lua Dev loader for Witchcraft (live DCS injection)
 tests/            busted unit tests (no DCS required)
   helpers/        DCS stubs + module loader
@@ -90,7 +90,7 @@ function CTLDMyManager:init()
 end
 ```
 
-2. Add the filename to `tools/merger_V2/listToMerge.txt` in dependency order.
+2. Add the filename to `tools/build/listToMerge.txt` in dependency order.
 3. Add a `dofile(SRC .. "CTLD_mymodule.lua")` line in `tools/CTLD_loader.lua`
    at the same position.
 4. Update `tests/helpers/loader.lua` with the same `dofile` line.
@@ -173,7 +173,7 @@ On crate unpack at new site:
 ### 5.4 Adding a new scene (dev checklist)
 
 1. Create `src/scenes/CTLD_myScene.lua` — model table + `CTLDSceneManager.getInstance():registerSceneModel(myScene)` at the bottom.
-2. Add the file to `tools/merger_V2/listToMerge.txt` and `tools/CTLD_loader.lua`.
+2. Add the file to `tools/build/listToMerge.txt` and `tools/CTLD_loader.lua`.
 3. Declare a crate in `CTLD_userConfig.lua` with `unit = "My Scene Name"`.
 4. If the scene deploys a DCS Invisible FARP: add a func-only step at the end to call `w:setLiquidAmount(type, qty)` using `getLiquidAmount` (not `getLiquid`).
 5. If repack support is needed: implement `myScene.onRepack(scene, repackData)` reading `w:getLiquidAmount(type)`.
@@ -257,7 +257,7 @@ _spawnUnpacked(desc, pos, coa, cId, playerName)
 
 **Local (Windows):**
 ```
-powershell -ExecutionPolicy Bypass -File tools/merger_V2/merge_CTLD.ps1
+powershell -ExecutionPolicy Bypass -File tools/build/merge_CTLD.ps1
 ```
 Output: `CTLD_Next.lua` at repo root (gitignored). UTF-8 without BOM (required by DCS).
 
@@ -469,7 +469,7 @@ lands near a packable vehicle.
 1. Add `ctld.tr("My new text")` in the source file.
 2. Add the entry to `src/CTLD_i18n_en.lua` (key = value for EN).
 3. Bump `translation_version` in `CTLD_i18n_en.lua`.
-4. Run `tools/merger_V2/generate_i18n_dicts.ps1` — it propagates the new key
+4. Run `tools/build/generate_i18n_dicts.ps1` — it propagates the new key
    (with EN value as placeholder) to all other language files and regenerates
    the merged loader.
 5. Translators fill in the placeholder values in their language file.
@@ -478,7 +478,7 @@ lands near a packable vehicle.
 
 1. Copy `src/CTLD_i18n_en.lua` to `src/CTLD_i18n_XX.lua`.
 2. Translate all values (keep keys identical to EN).
-3. Add `CTLD_i18n_XX.lua` to `tools/merger_V2/listToMerge.txt`.
+3. Add `CTLD_i18n_XX.lua` to `tools/build/listToMerge.txt`.
 4. Add `ctld.i18n_lang = "XX"` as an option in `src/CTLD_i18n.lua`.
 5. Regenerate: run `generate_i18n_dicts.ps1`.
 

@@ -1126,8 +1126,8 @@ See [`docs/dev-guide.md`](docs/dev-guide.md) for:
 **Build locally:**
 
 ```
-cd tools/merger_V2
-powershell -ExecutionPolicy Bypass -File tools/merger_V2/merge_CTLD.ps1
+cd tools/build
+powershell -ExecutionPolicy Bypass -File tools/build/merge_CTLD.ps1
 ```
 Output: `CTLD_Next.lua` at repo root.
 

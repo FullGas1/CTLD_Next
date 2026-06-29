@@ -1,7 +1,7 @@
 How to run the merge (PowerShell)
 ----------------------------------
-1> Run: powershell -ExecutionPolicy Bypass -File tools/merger_V2/merge_CTLD.ps1
-2> In PowerShell, enter: powershell -ExecutionPolicy Bypass -File tools/merger_V2/merge_CTLD.ps1
+1> Run: powershell -ExecutionPolicy Bypass -File tools/build/merge_CTLD.ps1
+2> In PowerShell, enter: powershell -ExecutionPolicy Bypass -File tools/build/merge_CTLD.ps1
    Confirm execution if prompted.
 
 The merger reads listToMerge.txt, merges all source files from ../src/

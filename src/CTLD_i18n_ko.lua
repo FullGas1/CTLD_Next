@@ -4,7 +4,7 @@
 
     Translator: rising_star (original), Claude AI (RECON + new entries 2026-04-28)
     Note: weapon system proper nouns (BTR-D, BRDM-2, MLRS, etc.) are kept in their original form.
-    To update: run tools/merger_V2/generate_i18n_dicts.ps1 after any ctld.tr() change.
+    To update: run tools/build/generate_i18n_dicts.ps1 after any ctld.tr() change.
 ]]
 if not ctld then ctld = {} end
 if not ctld.i18n then ctld.i18n = {} end

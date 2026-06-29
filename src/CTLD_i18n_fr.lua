@@ -3,7 +3,7 @@
     Translation version: 1.7
 
     Translator: FullGas1
-    To update: run tools/merger_V2/generate_i18n_dicts.ps1 after any ctld.tr() change.
+    To update: run tools/build/generate_i18n_dicts.ps1 after any ctld.tr() change.
 ]]
 if not ctld then ctld = {} end
 if not ctld.i18n then ctld.i18n = {} end

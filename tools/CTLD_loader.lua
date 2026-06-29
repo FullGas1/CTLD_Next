@@ -1,7 +1,7 @@
 ---@diagnostic disable
 -- CTLD Dev Loader
--- Auto-generated from merger_V2/listToMerge.txt - DO NOT EDIT MANUALLY
--- Regenerate with: powershell -ExecutionPolicy Bypass -File tools/merger_V2/generate_loader.ps1
+-- Auto-generated from build/listToMerge.txt - DO NOT EDIT MANUALLY
+-- Regenerate with: powershell -ExecutionPolicy Bypass -File tools/build/generate_loader.ps1
 --
 -- HOW TO USE:
 --   1. Set CTLD_SOURCE_PATH to the absolute path of your src/ directory.

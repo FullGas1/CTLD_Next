@@ -48,7 +48,7 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────
   # Job 2 — Merge build (produces CTLD_Next.lua)
-  # Replicates merger_V2/merger.cmd logic in PowerShell so that
+  # Replicates build/merger.cmd logic in PowerShell so that
   # the CI runner does not block on the interactive 'pause'.
   # Missing files → warning (same behaviour as the local .cmd).
   # ─────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ jobs:
       - name: Build CTLD_Next.lua
         id: merge
         run: |
-          $listFile = "tools\merger_V2\listToMerge.txt"
+          $listFile = "tools\build\listToMerge.txt"
           $srcDir   = "src"
           $outFile  = "CTLD_Next.lua"
 
@@ -175,7 +175,7 @@ jobs:
 
       - name: Build CTLD_Next.lua
         run: |
-          $listFile = "tools\merger_V2\listToMerge.txt"
+          $listFile = "tools\build\listToMerge.txt"
           $srcDir   = "src"
           $outFile  = "CTLD_Next.lua"
 
