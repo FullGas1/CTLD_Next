@@ -6,7 +6,7 @@
 
 -- Resolve repo root so we can dofile src/scenes/CTLD_mineFieldScene.lua
 local _thisFile = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]unit[\\/]")
-assert(_thisFile, "minefield_spec: cannot resolve repo root")
+if not _thisFile then _thisFile = "" end  -- relative path: cwd is repo root
 
 -- ─────────────────────────────────────────────────────────────
 describe("mineFieldScene", function()

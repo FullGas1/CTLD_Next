@@ -8,7 +8,7 @@
 
 -- Resolve repo root to dofile the validator (not loaded by default loader)
 local _thisFile = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]unit[\\/]")
-assert(_thisFile, "modvalidator_spec: cannot resolve repo root")
+if not _thisFile then _thisFile = "" end  -- relative path: cwd is repo root
 
 -- ─────────────────────────────────────────────────────────────
 describe("CTLDModValidator", function()

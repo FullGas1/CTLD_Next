@@ -39,6 +39,7 @@ local function makeTroopGroup(name, dbKey, total, weight)
         inf          = total or 4,
         mg=0, at=0, aa=0, mortar=0, jtac=0, civ=0,
         specificParams = {},
+        coalitionId  = coalition.side.BLUE,
     })
 end
 

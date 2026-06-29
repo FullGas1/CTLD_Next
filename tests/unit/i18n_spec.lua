@@ -7,7 +7,7 @@
 
 -- Resolve repo root from this file's path
 local _root = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]unit[\\/]")
-assert(_root, "i18n_spec.lua: cannot resolve repo root")
+if not _root then _root = "" end  -- relative path: cwd is repo root
 local SRC = _root .. "src/"
 
 -- Load non-EN dictionaries once (idempotent: ctld.i18n["fr"] will already exist if reloaded)

@@ -53,14 +53,14 @@ describe("Mark IDs — F-115", function()
     end)
 
     it("[6b] drawQuad increments MarkIdCounter by 1", function()
-        local before = ctld.utils.MarkIdCounter
+        local before = ctld._markIdCounter
         pcall(function()
             ctld.utils.drawQuad(-1, {
                 {x=0,y=0,z=0}, {x=100,y=0,z=0},
                 {x=100,y=0,z=100}, {x=0,y=0,z=100}
             }, "test")
         end)
-        assert.equals(before + 1, ctld.utils.MarkIdCounter)
+        assert.equals(before + 1, ctld._markIdCounter)
     end)
 
     it("[6c] drawQuad does NOT increment UniqIdCounter", function()
