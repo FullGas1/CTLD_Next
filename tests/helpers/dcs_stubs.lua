@@ -113,7 +113,32 @@ world = {
     addEventHandler = function(handler) end,
     removeEventHandler = function(handler) end,
     VolumeType      = { SPHERE = 0, BOX = 4 },
-    event           = {},
+    event           = {
+        S_EVENT_INVALID              = 0,
+        S_EVENT_SHOT                 = 1,
+        S_EVENT_HIT                  = 2,
+        S_EVENT_TAKEOFF              = 3,
+        S_EVENT_LAND                 = 4,
+        S_EVENT_CRASH                = 5,
+        S_EVENT_EJECTION             = 6,
+        S_EVENT_REFUELING            = 7,
+        S_EVENT_DEAD                 = 8,
+        S_EVENT_PILOT_DEAD           = 9,
+        S_EVENT_BASE_CAPTURED        = 10,
+        S_EVENT_MISSION_START        = 11,
+        S_EVENT_MISSION_END          = 12,
+        S_EVENT_TOOK_CONTROL         = 13,
+        S_EVENT_REFUELING_STOP       = 14,
+        S_EVENT_BIRTH                = 15,
+        S_EVENT_PLAYER_ENTER_UNIT    = 20,
+        S_EVENT_PLAYER_LEAVE_UNIT    = 21,
+        S_EVENT_PLAYER_COMMENT       = 22,
+        S_EVENT_SHOOTING_START       = 23,
+        S_EVENT_SHOOTING_END         = 24,
+        S_EVENT_MARK_ADDED           = 25,
+        S_EVENT_MARK_CHANGE          = 26,
+        S_EVENT_MARK_REMOVED         = 27,
+    },
 }
 
 -- ── land ─────────────────────────────────────────────────────
@@ -121,6 +146,13 @@ land = {
     getHeight    = function(p) return 0 end,
     getSurfaceType = function(p) return 1 end,
     SurfaceType  = { LAND = 1, SHALLOW_WATER = 2, WATER = 3, ROAD = 4, RUNWAY = 5 },
+}
+
+-- ── coord ────────────────────────────────────────────────────
+coord = {
+    LOtoLL  = function(p) return 0, 0 end,
+    LLtoLO  = function(lat, lon) return { x = 0, y = 0, z = 0 } end,
+    LLtoMGRS = function(lat, lon) return { UTMZone = "37T", MGRSDigraph = "CB", Easting = 0, Northing = 0 } end,
 }
 
 -- ── atmosphere ───────────────────────────────────────────────
