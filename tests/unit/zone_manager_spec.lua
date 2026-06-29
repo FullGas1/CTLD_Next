@@ -437,3 +437,267 @@ describe("CTLDLogisticZone (static)", function()
     end)
 
 end)
+
+-- ─────────────────────────────────────────────────────────────
+describe("CTLDZoneManager dynamic zone methods", function()
+
+    -- DCS stub overrides (save/restore per test block)
+    local _origGetZone, _origSmoke, _origGetHeight, _origUnitByName
+    local _zoneData, _smokeLog, _unitByName
+
+    before_each(function()
+        -- Reset singleton
+        CTLDZoneManager._instance = nil
+
+        -- Save originals
+        _origGetZone   = trigger.misc.getZone
+        _origSmoke     = trigger.action.smoke
+        _origGetHeight = land.getHeight
+        _origUnitByName = Unit.getByName
+
+        -- Stub state
+        _zoneData   = {}
+        _smokeLog   = {}
+        _unitByName = {}
+
+        trigger.misc.getZone   = function(name) return _zoneData[name] end
+        trigger.action.smoke   = function(pt, color) table.insert(_smokeLog, { pt=pt, color=color }) end
+        land.getHeight         = function(p) return 10 end
+        Unit.getByName         = function(name) return _unitByName[name] end
+    end)
+
+    after_each(function()
+        trigger.misc.getZone   = _origGetZone
+        trigger.action.smoke   = _origSmoke
+        land.getHeight         = _origGetHeight
+        Unit.getByName         = _origUnitByName
+        CTLDZoneManager._instance = nil
+    end)
+
+    local function registerZone(name, x, z, r)
+        _zoneData[name] = { point = { x=x, z=z }, radius = r or 100 }
+    end
+
+    -- ── createExtractZone (U-082) ─────────────────────────────
+    describe("createExtractZone (U-082)", function()
+
+        it("valid zone: returns true", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            assert.is_true(zm:createExtractZone("EXZ1", 42, -1))
+        end)
+
+        it("valid zone: zone stored in _troopZones", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            assert.is_not_nil(zm._troopZones["EXZ1"])
+        end)
+
+        it("objectiveFlag stored as string", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            assert.equals("42", zm._troopZones["EXZ1"].objectiveFlag)
+        end)
+
+        it("radius taken from DCS zone data", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            assert.equals(150, zm._troopZones["EXZ1"].radius)
+        end)
+
+        it("zone is active=true after create", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            assert.is_true(zm._troopZones["EXZ1"].active)
+        end)
+
+        it("hasExtract()==true, hasPickup()==false", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            local z = zm._troopZones["EXZ1"]
+            assert.is_true(z:hasExtract())
+            assert.is_false(z:hasPickup())
+        end)
+
+        it("smoke=-1: no smoke fired", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            assert.equals(0, #_smokeLog)
+        end)
+
+        it("smoke>=0: smoke action fired", function()
+            registerZone("EXZ2", 3000, 4000, 100)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ2", "objFlag", 1)
+            assert.equals(1, #_smokeLog)
+        end)
+
+        it("duplicate zone name: returns false", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            assert.is_false(zm:createExtractZone("EXZ1", 99))
+        end)
+
+        it("invalid (non-existent) zone: returns false", function()
+            local zm = CTLDZoneManager.getInstance()
+            assert.is_false(zm:createExtractZone("NO_SUCH_ZONE", 1))
+        end)
+
+    end)
+
+    -- ── removeExtractZone (U-082) ─────────────────────────────
+    describe("removeExtractZone (U-082)", function()
+
+        it("remove existing zone: returns true", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            assert.is_true(zm:removeExtractZone("EXZ1", 42))
+        end)
+
+        it("remove existing zone: zone no longer in _troopZones", function()
+            registerZone("EXZ1", 1000, 2000, 150)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("EXZ1", 42, -1)
+            zm:removeExtractZone("EXZ1", 42)
+            assert.is_nil(zm._troopZones["EXZ1"])
+        end)
+
+        it("remove non-existent zone: returns false", function()
+            local zm = CTLDZoneManager.getInstance()
+            assert.is_false(zm:removeExtractZone("NO_ZONE"))
+        end)
+
+    end)
+
+    -- ── changeRemainingGroups (U-082) ─────────────────────────
+    describe("changeRemainingGroups (U-082)", function()
+
+        it("extract-only zone (no pickup stock): returns false", function()
+            registerZone("PKZ1", 500, 500, 80)
+            local zm = CTLDZoneManager.getInstance()
+            zm:createExtractZone("PKZ1", "f1", -1)
+            assert.is_false(zm:changeRemainingGroups("PKZ1", 3))
+        end)
+
+        it("pickup zone: +3 increases stock", function()
+            local zm = CTLDZoneManager.getInstance()
+            local pzone = CTLDTroopZone:new({
+                dcsName="PKZ2", zoneName="PKZ2", coalition=2,
+                center={x=100,y=10,z=100}, radius=50, pickMaxStock=5, active=true,
+            })
+            zm._troopZones["PKZ2"] = pzone
+            zm:changeRemainingGroups("PKZ2", 3)
+            assert.equals(8, pzone.pickCurrentStock)
+        end)
+
+        it("pickup zone: -4 decreases stock", function()
+            local zm = CTLDZoneManager.getInstance()
+            local pzone = CTLDTroopZone:new({
+                dcsName="PKZ2", zoneName="PKZ2", coalition=2,
+                center={x=100,y=10,z=100}, radius=50, pickMaxStock=5, active=true,
+            })
+            zm._troopZones["PKZ2"] = pzone
+            zm:changeRemainingGroups("PKZ2", 3)
+            zm:changeRemainingGroups("PKZ2", -4)
+            assert.equals(4, pzone.pickCurrentStock)
+        end)
+
+        it("pickup zone: clamped to 0 when amount exceeds stock", function()
+            local zm = CTLDZoneManager.getInstance()
+            local pzone = CTLDTroopZone:new({
+                dcsName="PKZ2", zoneName="PKZ2", coalition=2,
+                center={x=100,y=10,z=100}, radius=50, pickMaxStock=5, active=true,
+            })
+            zm._troopZones["PKZ2"] = pzone
+            zm:changeRemainingGroups("PKZ2", -10)
+            assert.equals(0, pzone.pickCurrentStock)
+        end)
+
+        it("unknown zone name: returns false", function()
+            local zm = CTLDZoneManager.getInstance()
+            assert.is_false(zm:changeRemainingGroups("NOPE", 1))
+        end)
+
+    end)
+
+    -- ── isUnitInZone (U-082) ──────────────────────────────────
+    describe("isUnitInZone (U-082)", function()
+
+        it("unit inside extract zone: returns the zone", function()
+            local zm = CTLDZoneManager.getInstance()
+            local exz = CTLDTroopZone:new({
+                dcsName="EXZ3", zoneName="EXZ3", coalition=0,
+                center={x=0,y=0,z=0}, radius=200,
+                objectiveFlag="myFlag", active=true,
+            })
+            zm._troopZones["EXZ3"] = exz
+            _unitByName["unitInside"] = {
+                isExist  = function() return true end,
+                getPoint = function() return { x=50, y=0, z=50 } end,
+            }
+            local found = zm:isUnitInZone("unitInside", "extract")
+            assert.is_not_nil(found)
+        end)
+
+        it("unit inside extract zone: returns correct zone name", function()
+            local zm = CTLDZoneManager.getInstance()
+            local exz = CTLDTroopZone:new({
+                dcsName="EXZ3", zoneName="EXZ3", coalition=0,
+                center={x=0,y=0,z=0}, radius=200,
+                objectiveFlag="myFlag", active=true,
+            })
+            zm._troopZones["EXZ3"] = exz
+            _unitByName["unitInside"] = {
+                isExist  = function() return true end,
+                getPoint = function() return { x=50, y=0, z=50 } end,
+            }
+            local found = zm:isUnitInZone("unitInside", "extract")
+            assert.equals("EXZ3", found.zoneName)
+        end)
+
+        it("unit outside all zones: returns nil", function()
+            local zm = CTLDZoneManager.getInstance()
+            local exz = CTLDTroopZone:new({
+                dcsName="EXZ3", zoneName="EXZ3", coalition=0,
+                center={x=0,y=0,z=0}, radius=200,
+                objectiveFlag="myFlag", active=true,
+            })
+            zm._troopZones["EXZ3"] = exz
+            _unitByName["unitOutside"] = {
+                isExist  = function() return true end,
+                getPoint = function() return { x=5000, y=0, z=5000 } end,
+            }
+            assert.is_nil(zm:isUnitInZone("unitOutside", "extract"))
+        end)
+
+        it("unit inside extract zone, lookup pickup type: returns nil", function()
+            local zm = CTLDZoneManager.getInstance()
+            local exz = CTLDTroopZone:new({
+                dcsName="EXZ3", zoneName="EXZ3", coalition=0,
+                center={x=0,y=0,z=0}, radius=200,
+                objectiveFlag="myFlag", active=true,
+            })
+            zm._troopZones["EXZ3"] = exz
+            _unitByName["unitInside"] = {
+                isExist  = function() return true end,
+                getPoint = function() return { x=50, y=0, z=50 } end,
+            }
+            assert.is_nil(zm:isUnitInZone("unitInside", "pickup"))
+        end)
+
+        it("unknown unit name: returns nil", function()
+            local zm = CTLDZoneManager.getInstance()
+            assert.is_nil(zm:isUnitInZone("UNKNOWN", "extract"))
+        end)
+
+    end)
+
+end)
