@@ -1,192 +1,178 @@
 # CTLD Next — Release Testing Procedure
 
-This document describes the test procedure to be applied before each release.
-Testing is organized in four levels (L1→L4); L1 and L2 are automated via GitHub Actions CI,
-L3 and L4 require a live DCS session.
+Testing is organized in four levels (L1→L4).
+L1 and L2 run automatically via GitHub Actions CI.
+L3 and L4 require a live DCS session with Witchcraft active.
+
+For the technical details of running Witchcraft sessions (injection commands, debug
+configuration, CTLD.log setup), see [`docs/dev-guide.md`](dev-guide.md) §8 Testing.
 
 ---
 
-## 1. Automated testing (GitHub Actions CI)
+## Architecture overview
 
-### Trigger conditions
+```text
+RELEASE
+  │
+  ├─ L1/L2 — CI busted (automatic, GitHub Actions)
+  │    ├─ tests/unit/*_spec.lua         ← ~105 tests U-xxx
+  │    └─ tests/functional/*_spec.lua   ← ~45 tests F-xxx selected
+  │
+  ├─ L3 — Witchcraft AUTO (DCS, no player required)
+  │    ├─ live_tests/scenarios/auto/*.lua    ← 20 integration scenarios
+  │    └─ live_tests/functional/F-xxx.lua   ← 116 targeted tests
+  │
+  └─ L4 — Witchcraft INTERACTIVE (DCS + player slot)
+       ├─ live_tests/scenarios/interactive/*.lua   ← 32 scenarios
+       └─ live_tests/manual_test_sequences.md      ← 4 MT-xx sequences
+```
 
-The CI pipeline (`.github/workflows/ci.yml`) runs automatically on:
-- Every push to `master` or any `feature_*` branch
-- Every pull request targeting `master`
-- Every version tag (`v*`) — also triggers the GitHub Release job
+---
 
-### Jobs and scripts
+## Correct release order
 
-| Job | Name | Tool | Scope |
-|-----|------|------|-------|
-| 1 | Lua Syntax Check | Lua 5.4 `loadfile()` | All `src/**/*.lua` |
-| 2 | Merge Build | `tools/build/listToMerge.txt` + PowerShell | Produces `CTLD_Next.lua` |
-| 3 | busted Tests | `busted tests/` | `tests/unit/` (L1) + `tests/functional/` (L2) |
-| 4 | Deploy Docs | MkDocs Material | `docs/` → GitHub Pages (master only) |
-| 5 | GitHub Release | `gh release create` | Attaches `CTLD_Next.lua` to the tag (tags only) |
+```text
+Modify src/
+    ↓
+[LOCAL] L3 Witchcraft AUTO  — inject relevant F-xxx and scenarios/auto/
+    ↓ (PASS)
+[LOCAL] L4 Witchcraft INTERACTIVE — if player-visible feature
+    ↓ (PASS)
+git push → CI L1/L2 runs automatically
+    ↓ (CI green)
+PR → merge to master
+    ↓
+git tag vX.Y → CI Release job builds and publishes CTLD_Next.lua
+```
 
-### Test coverage (busted — Job 3)
+L3/L4 must happen **before** the push: the CI only runs stubs, it cannot detect real DCS
+regressions. A green CI with a failing L3 means the code is broken without the CI knowing it.
 
-**L1 — Unit tests** (`tests/unit/*_spec.lua`):
-21 spec files covering U-001→U-096, U-106→U-108 (~105 tests).
+**Exception:** cosmetic changes (comments, docs, non-functional refactors) may be pushed
+directly without L3/L4.
+
+---
+
+## L1 — Unit tests (automated)
+
+**Who:** GitHub Actions.
+**When:** every push to `master` or `feature_*`, every PR.
+**Scripts:** `tests/unit/*_spec.lua` — 21 files, ~105 tests.
+**Runner:** `busted tests/` (Job 3 in `.github/workflows/ci.yml`).
+
 Scope: Config, EventDispatcher, Zones, Crates, Troops, JTAC, Menu, Utils, i18n, ModValidator.
+All DCS API calls are replaced by stubs in `tests/helpers/dcs_stubs.lua`.
 
-**L2 — Functional tests** (`tests/functional/*_spec.lua`):
-8 spec files covering ~45 tests. No real DCS spawn — all DCS API calls are stubbed via `tests/helpers/dcs_stubs.lua`.
+Failure details are printed in the "Run busted" step log on GitHub Actions and annotated on PR checks.
+
+---
+
+## L2 — Functional tests (automated)
+
+**Who:** GitHub Actions.
+**When:** same triggers as L1 (same `busted tests/` command).
+**Scripts:** `tests/functional/*_spec.lua` — 8 files, ~45 tests.
 
 | Spec file | Reference | Coverage |
-|-----------|-----------|----------|
+| --------- | --------- | -------- |
 | `troop_manager_spec.lua` | F-033→F-036 | embarkFromTroopZone, disembark, returnToTroopZone, embarkFromField |
 | `jtac_manager_spec.lua` | F-037→F-040 | spawnJTAC, setJTACInTransit, requestSmoke, killJTAC |
 | `parachute_spec.lua` | F-057→F-071 | parachuteCrates/Troops/Vehicles, slingload hover/release/cut |
 | `utils_spec.lua` | F-078→F-080 | getCentroid, calcDropPosition, getSpawnObjectPositions |
 | `config_spec.lua` | F-101→F-105 | YAML override, singleton reset, i18n fallback chain, FR/ES/KO audit |
-| `mark_ids_spec.lua` | F-115 | Global mark ID counter monotonicity and sharing |
+| `mark_ids_spec.lua` | F-115 | Global mark ID counter monotonicity |
 | `vehicle_spec.lua` | F-120→F-123 | findLoadableVehicles, loadVehicle, unloadVehicle, _spawnUnpacked |
 | `troop_multi_spec.lua` | F-140→F-146 | Multi-group transit, disembarkAll/Index, _menuCheckCargo |
 
-### Failure reporting
-
-- Each job reports its status as a **GitHub commit status check**, visible in pull request checks.
-- Syntax errors (Job 1): annotated directly on the failing file with `::error file=...::` format.
-- busted failures (Job 3): the failing test name and assertion are printed to the job log.
-  Navigate to: GitHub → Actions → run → "busted Tests" → expand "Run busted" step.
-- Build failures (Job 2): listed per missing file with `::warning::` or `::error::` annotations.
-
-### Accessing CI logs
-
-1. Go to the repository on GitHub → **Actions** tab.
-2. Select the failing workflow run.
-3. Click the failing job to expand its steps.
-4. Full test output (including busted tap format) is in the "Run busted" step log.
-
-### Running tests locally
-
-```bash
-# Install busted (one-time)
-luarocks install busted
-
-# Run all tests from the repo root
-busted tests/
-
-# Run only functional tests
-busted tests/functional/
-
-# Run a single spec file
-busted tests/functional/troop_manager_spec.lua
-```
+These tests cover full flows without real DCS spawns — the DCS API is stubbed.
+They are distinct from `live_tests/functional/F-xxx.lua` which are Witchcraft injection
+scripts for DCS and do **not** use the busted format (no `_spec` suffix, not picked up by CI).
 
 ---
 
-## 2. Non-automated testing (Witchcraft DCS)
+## L3 — Witchcraft AUTO (developer, before push)
 
-Tests at levels L3 and L4 require a live DCS mission session with Witchcraft active.
-They cover features that cannot be stub-tested: visual spawns, real DCS group creation,
-physical slingload, player-interactive menus.
+**Who:** developer.
+**When:** before pushing, for every modified module.
+**How:** inject scripts into a running DCS mission (no player slot needed). See `dev-guide.md` §8 for setup.
 
-### Prerequisites
+Success criterion: `fail=0` in the result line, no `[FAIL]` entries in `CTLD.log`.
 
-- DCS World running with mission `missions/Test_CTLDNEXT_01.miz` (or equivalent test mission).
-- Witchcraft Node.js bridge installed at `%USERPROFILE%/.vscode-dcs-tools/bridge.js`.
-- If `src/` was modified since last test: rebuild first:
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File "tools\build\merge_CTLD.ps1"
-  ```
-- `ctldLogPath` must be set in the test mission's MISSION START trigger for CTLD.log to be created.
+### L3a — `live_tests/functional/F-xxx.lua` (116 files)
 
-### Injection command
+Targeted tests, one behavior per file. Inject the F-xxx files covering the modified module.
 
-```bash
-node "%USERPROFILE%/.vscode-dcs-tools/bridge.js" "<absolute_path_to_script.lua>"
-```
+| Modified module | Scripts to inject |
+| --------------- | ----------------- |
+| `CTLD_troop.lua` | F-033→F-036, F-059→F-060, F-140→F-146 |
+| `CTLD_jtac.lua` | F-037→F-040, F-110→F-112 |
+| `CTLD_crate.lua` | F-027→F-032, F-057→F-058, F-061→F-071, F-120→F-123 |
+| `CTLD_vehicle.lua` | F-015→F-020, F-120→F-123 |
+| `CTLD_core.lua` (AI) | F-133, F-134, F-176→F-182 |
+| `CTLD_zone.lua` | F-003→F-005 |
+| `CTLD_recon.lua` | F-009→F-011, F-115→F-119 |
+| `CTLD_config.lua` / i18n | F-101→F-105 |
 
-VS Code task shortcut: **Shift+Ctrl+B** → `DCS-Witchcraft: Execute Global`.
+### L3b — `live_tests/scenarios/auto/*.lua` (20 files)
 
-### L3 — Automated Witchcraft scenarios (no player required)
-
-Scripts: `live_tests/scenarios/auto/scenario_*.lua` and individual `live_tests/functional/F-xxx.lua` files.
-
-**Procedure:**
-
-1. Start DCS, load the test mission, wait for it to initialize.
-2. Inject `CTLD_Next.lua` (the merged build).
-3. Wait **3–5 seconds** for CTLD initialization to complete.
-4. Inject the target scenario script.
-5. Read `CTLD.log`: look for `[PASS]` / `[FAIL]` / `[F-xxx RESULT] pass=N fail=0`.
-6. If failures occur: read the `[FAIL]` lines (label, expected, got), fix the issue,
-   rebuild if needed, re-inject from step 2.
-
-**Success criterion:** all `[FAIL]` lines absent; `pass=N fail=0` at the end of the script.
-
-**Output format:**
-```
-[F-120 PASS] U-01 empty before inject
-[F-120 PASS] U-02 WAITING found
-[F-120 FAIL] F-01 state LOADED  expected=LOADED  got=WAITING
-[F-120 RESULT] pass=6 fail=1
-```
-
-### L4 — Interactive Witchcraft (player slot required)
-
-Scripts: `live_tests/functional/F-xxx.lua` files that call `ctld_test.getTransport()` and
-require a BLUE player in a transport aircraft (typically UH-1H).
-
-**Procedure:**
-
-1. Start DCS, load the test mission, take a **BLUE transport slot** (e.g., UH-1H).
-2. Activate Witchcraft (join slot, verify bridge connection).
-3. Inject `CTLD_Next.lua` and wait 3–5 s for init.
-4. Inject the scenario script.
-5. Follow any on-screen instructions (position aircraft, use F10 menus, etc.).
-6. Verify: screen messages via `trigger.action.outText`, entries in `CTLD.log`.
-7. Perform visual validation where applicable (unit spawns, smoke, beacons).
-
-**Success criterion:** script output shows `pass=N fail=0`; visual checks match expectations.
-
-### Manual test sequences
-
-For complex multi-step scenarios (multi-crate assembly, full FARP/FOB build cycle,
-AI transport end-to-end), consult `live_tests/manual_test_sequences.md`.
-Each MT-xx entry lists the exact steps and expected outcomes.
+Wider integration scenarios without a player. Run those matching the modified feature.
+Examples: `scenario_b3_load_crate_from_menu.lua`, `aiTransport_featureT_*.lua`,
+`scenario_jtac_toggle_lasing.lua`.
 
 ---
 
-## 3. Other testing guidance
+## L4 — Witchcraft INTERACTIVE (developer + player slot, before push)
 
-### Pre-release checklist
+**Who:** developer in a BLUE transport slot (typically UH-1H).
+**When:** before pushing, only for player-visible features (F10 menus, visual spawns, effects).
+**How:** inject scripts after taking the slot. See `dev-guide.md` §8 for setup.
 
-Before tagging a release:
+### L4a — `live_tests/scenarios/interactive/*.lua` (32 files)
+
+Scenarios that manipulate real DCS objects via the player. Follow on-screen instructions
+for positioning and menu actions.
+Examples: `scenarioTroopsFullCycle_v2.lua`, `scenario_multigroup_transport.lua`,
+`scenario_fob_scene.lua`, `scenario_warehouse_cycle.lua`.
+
+Success criterion: `fail=0` in result line + visual checks pass.
+
+### L4b — `live_tests/manual_test_sequences.md` (4 MT-xx sequences)
+
+Purely manual step-by-step checklists (no script):
+
+| Sequence | Feature | Steps |
+| -------- | ------- | ----- |
+| MT-01 | Multi-group troop transport + disembark menu | 10 |
+| MT-02 | Whole-vehicle load / unload / parachute | 9 |
+| MT-03 | Multi-vehicle load / unload / parachute | — |
+| MT-06 | RECON FARP/FOB layer | — |
+
+Run the relevant MT-xx whenever modifying the corresponding perimeter.
+MT-07→MT-16 are covered by `scenarios/interactive/scenario_mt07_*.lua` scripts (L4a).
+
+---
+
+## Summary: who does what per release
+
+| Level | Who | When | Approx. effort |
+| ----- | --- | ---- | -------------- |
+| L1 CI unit | GitHub Actions | Automatic (push / PR) | 0 |
+| L2 CI functional | GitHub Actions | Automatic (push / PR) | 0 |
+| L3a F-xxx targeted | Developer | Before push, modified modules only | ~5 min/module |
+| L3b scenarios/auto | Developer | Before push, complex features | ~10 min |
+| L4a scenarios/interactive | Developer + player slot | Before tag `vX.Y` | ~20–30 min |
+| L4b MT-xx manual | Developer + player slot | New player-visible features only | ~15 min/MT |
+
+---
+
+## Pre-release checklist
+
+Before tagging `vX.Y`:
 
 - [ ] All CI jobs green on `master` (syntax, build, busted).
-- [ ] Any new `src/` files added to `tools/build/listToMerge.txt`.
-- [ ] L3 scenarios executed for all modules modified since last release.
-- [ ] L4 interactive tests executed for player-visible features (menus, spawns, effects).
-- [ ] `live_tests/recette.md` updated: new F-xx / U-xx rows added, coverage summary updated.
+- [ ] Any new `src/` file added to `tools/build/listToMerge.txt`.
+- [ ] L3 executed for all modules modified since last release.
+- [ ] L4 executed for all player-visible features modified since last release.
+- [ ] `live_tests/recette.md` updated (new F-xx / U-xx rows, coverage summary).
 - [ ] `migration/MODERNIZATION-PLAN.md` statuses up to date.
 - [ ] `docs/missionmaker_guide.md` updated if any mission-maker-visible behavior changed.
-
-### Adding a new test to CI
-
-1. Create `tests/functional/<feature>_spec.lua` following the existing pattern
-   (singleton reset in `before_each`, DCS API mocked locally, stubs restored in `after_each`).
-2. Reference the corresponding `live_tests/functional/F-xxx.lua` in the file header.
-3. Run locally with `busted tests/functional/<feature>_spec.lua` to verify.
-4. Update `migration/MODERNIZATION-PLAN.md`: add the spec file to the TODO-CI-4 completion note.
-
-### Debug configuration (Witchcraft sessions)
-
-- Enable verbose logging: `CTLDConfig.get().settings["debug"] = true`
-  and `CTLDConfig.get().settings["debugScreenLog"] = true`.
-- Screen log duration: `CTLDConfig.get().settings["debugScreenLogDuration"] = 20`.
-- All `ctld.utils.log()` calls are then echoed on screen for 20 seconds.
-- **Do not use** `ctld.debug = true` alone — it does not activate `CTLD.log`.
-
-### Release tagging
-
-```bash
-git tag v2.x.y
-git push origin v2.x.y
-```
-
-The CI Release job (Job 5) will automatically build `CTLD_Next.lua` and attach it
-to a new GitHub Release with installation instructions.

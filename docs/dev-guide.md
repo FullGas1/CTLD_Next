@@ -330,17 +330,99 @@ This fires only when `ctld.path` is defined and loads `CTLD_Next.lua` directly f
 
 ## 8. Testing
 
-**busted (unit, no DCS):**
-```
-busted tests/specs/
-```
-Requires `luarocks install busted`.
+For the full release procedure (who runs what and when), see
+[`docs/recette-procedure.md`](recette-procedure.md).
+This section covers the technical rules for running tests locally.
 
-**Witchcraft (integration, requires live DCS mission):**
+### 8.1 busted (L1/L2 — no DCS)
+
+```bash
+# Install (one-time)
+luarocks install busted
+
+# Run all tests
+busted tests/
+
+# Run only functional specs
+busted tests/functional/
+
+# Run a single spec
+busted tests/functional/troop_manager_spec.lua
 ```
-node "%USERPROFILE%/.vscode-dcs-tools/bridge.js" "C:/path/to/live_tests/F-xx/test.lua"
+
+The `.busted` config (repo root) sets `pattern = "_spec"` and loads
+`tests/helpers/init.lua` before every spec. All DCS API calls are stubbed in
+`tests/helpers/dcs_stubs.lua`.
+
+### 8.2 Witchcraft (L3/L4 — live DCS)
+
+Witchcraft is a Node.js bridge that injects Lua scripts into a running DCS mission.
+
+**Injection command:**
+
+```bash
+node "%USERPROFILE%/.vscode-dcs-tools/bridge.js" "<absolute_path_to_script.lua>"
 ```
-Results in `live_tests/CTLD.log`.
+
+VS Code shortcut: **Shift+Ctrl+B** → `DCS-Witchcraft: Execute Global`.
+
+**Prerequisites before any injection:**
+
+- If `src/` was modified, rebuild first:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "tools\build\merge_CTLD.ps1"
+```
+
+- Inject `CTLD_Next.lua`.
+- Wait **3–5 seconds** for CTLD initialization to complete before injecting any test script.
+
+### 8.3 CTLD.log setup
+
+`CTLD.log` is only created when `ctldLogPath` is defined in the mission.
+Set it in the mission's **MISSION START** trigger (DO SCRIPT):
+
+```lua
+ctldLogPath = "C:/Users/<you>/Desktop/CTLD.log"
+```
+
+This is a local path, never committed. Without it, log output goes to `DCS.log` only.
+
+### 8.4 Debug configuration
+
+```lua
+local cfg = CTLDConfig.get()
+cfg.settings["debug"]                  = true   -- activates CTLD.log output
+cfg.settings["debugScreenLog"]         = true   -- echoes all log() calls on screen
+cfg.settings["debugScreenLogDuration"] = 20     -- screen display duration (seconds)
+```
+
+**Do not use** `ctld.debug = true` alone — it does not activate `CTLD.log`.
+
+### 8.5 Test script output format
+
+All `live_tests/functional/F-xxx.lua` and `live_tests/scenarios/auto/*.lua` scripts
+produce this format:
+
+```text
+[F-033 PASS] guard inactive zone → false
+[F-033 FAIL] success troops loaded  expected=true  got=false
+[F-033 RESULT] pass=8 fail=1
+```
+
+Success criterion: `fail=0` in the result line, no `[FAIL]` lines in `CTLD.log`.
+
+### 8.6 Cleanup between test runs
+
+If CTLD is already active in the mission, inject the cleanup script before re-injecting
+`CTLD_Next.lua`:
+
+```bash
+node bridge.js "live_tests/dev/shutdown_ctld.lua"
+```
+
+Each functional test script calls `ctld_test.cleanup()` internally for its own scope —
+the full shutdown is only needed between full CTLD reloads.
 
 ---
 
