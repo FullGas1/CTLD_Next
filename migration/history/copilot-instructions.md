@@ -88,7 +88,7 @@ CTLDObjectRegistry:register("SINGLE_HELIPAD", {
 ## Architecture (v2 target)
 
 - Source modules live in `src/` organized by domain: `lib/`, `core/`, `transport/`, `logistics/`, `jtac/`, `ui/`, `recon/`, `ai/`, `compat/`, `mist_compat/`.
-- OOP via a micro class system using metatables (`src/lib/class.lua`).
+- OOP via a micro class system using metatables (`src/core/class.lua`).
 - State is managed by a `StateManager` singleton and per-coalition `Coalition` instances — no more `ctld.xxxRED`/`ctld.xxxBLUE` table pairs.
 - Tests live in `test/` and use busted with DCS/MIST mocks.
 
@@ -132,7 +132,7 @@ CTLDObjectRegistry:register("SINGLE_HELIPAD", {
 ## Code style conventions
 
 - Follow existing file style and indentation.
-- OOP Lua 5.1: use the project class system (`src/lib/class.lua`) for new classes.
+- OOP Lua 5.1: use the project class system (`src/core/class.lua`) for new classes.
 - For internal helpers, follow existing naming patterns (local variables often prefixed with _).
 - Keep mission-designer guidance comments concise and practical.
 - No direct `mist.*` calls — use the middleware.

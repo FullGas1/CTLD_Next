@@ -1,7 +1,7 @@
 ---@diagnostic disable
 -- ============================================================
 -- U-56 : CTLDObjectRegistry — spawnObject() GROUND
--- Module  : P1 (src/lib/CTLD_objectRegistry.lua)
+-- Module  : P1 (src/core/CTLD_objectRegistry.lua)
 -- Objectif: Vérifier spawnObject pour groupes GROUND :
 --   nombre d'unités, résolution coalition-aware unitType,
 --   calcul des positions (rotation par heading)
@@ -10,7 +10,7 @@
 do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end
 
 dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/setup.lua")
-dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/lib/CTLD_objectRegistry.lua")
+dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/core/CTLD_objectRegistry.lua")
 
 ctld_test.start("U-56", "CTLDObjectRegistry spawnObject() GROUND")
 

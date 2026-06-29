@@ -18,7 +18,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 | # | Topic | Decision |
 | - | ----- | -------- |
 | 1 | Module split | ✅ **Done** — `src/` files concatenated → `CTLD_Next.lua` by `tools/build/merge_CTLD.ps1`. Order: `tools/build/listToMerge.txt` |
-| 2 | OOP | ✅ **Done** — `src/lib/class.lua` created (P1). All entity classes refactored. |
+| 2 | OOP | ✅ **Done** — `src/core/class.lua` created (P1). All entity classes refactored. |
 | 3 | MIST | ✅ **Done** — all `mist.*` calls replaced by `ctld.utils.*`. No active `mist.*` call in `src/` |
 | 4 | Legacy API | ✅ **Done** — `src/legacy/legacy_api.lua` (22 wrappers, thin delegates) [2026-04-15] |
 | 5 | Lua env | Lua 5.1 DCS sandbox, desanitized server (`io`, `os`, `lfs` accessible) |
@@ -28,7 +28,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 | 9 | Branching | Feature branches `feature/<description>`. `master` stays stable |
 | 10 | Events | ✅ **Done** — 38 CTLD events specified. EventDispatcher ✅. CTLDDCSEventBridge ✅. StateManager + Coalition supprimés (absorbés par managers). C1 impl ✅ [2026-04-02]. |
 | 11 | Scenes | ✅ **Done** — `src/scenes/` (9 files). Auto-register via `CTLDSceneManager.getInstance():registerSceneModel(...)` |
-| 12 | Registry | ✅ **Done** — `src/lib/CTLD_objectRegistry.lua` relocated. Scope: spawn descriptors + scenes only. |
+| 12 | Registry | ✅ **Done** — `src/core/CTLD_objectRegistry.lua` relocated. Scope: spawn descriptors + scenes only. |
 | 13 | Core bridge | ✅ **Done** — `CTLDDCSEventBridge` + `CTLDPlayerTracker` specs validated. C1 impl ✅ [2026-04-02]. |
 | 14 | Review | Ongoing — for every implemented file: analyse → propose improvements → validate → fix before moving on |
 
@@ -54,7 +54,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 
 ```text
 ── FONDATIONS IMPLÉMENTÉES, RECETTE COMPLÈTE ─────────────────────────────────
-✅ P1  src/lib/class.lua + objectRegistry          recette: N/A (lib interne)
+✅ P1  src/core/class.lua + objectRegistry          recette: N/A (lib interne)
 ✅ C1  src/CTLD_core.lua                           recette: 9/9  100% [2026-04-02]
 ✅ M1  src/CTLD_zone.lua                           recette: 9/9  100% [2026-04-02]
 ✅ M2  src/CTLD_beacon.lua                         recette: 5/5  100% [2026-04-02]
@@ -139,7 +139,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
         implémenté dans CTLD_utils.lua (initLog/log/closeLog/reopenLogAppend) [2026-04-07]
 
 ✅  FA  Feature A — Virtual parachute (crates + troops + vehicles)  [2026-04-08]
-        CTLDParachuteEffect + NullParachuteEffect (src/lib/)
+        CTLDParachuteEffect + NullParachuteEffect (src/core/)
         ctld.utils.calcDropPosition() ajouté (CTLD_utils.lua)
         8 params parachute + canParachute dans unitActions (CTLD_config.lua)
         parachuteCrates/Troops/Vehicle() + menus F10 conditionnels (canParachute)
@@ -951,7 +951,7 @@ CTLD_menu, CTLD_recon, CTLD_utils, load_event). Retained 3 reference files:
 
 ### 2.0 — OOP micro-framework ✅ DONE (P1)
 
-Create `src/lib/class.lua`:
+Create `src/core/class.lua`:
 
 ```lua
 local function class(base)

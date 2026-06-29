@@ -1,14 +1,14 @@
 ---@diagnostic disable
 -- ============================================================
 -- U-54 : CTLDObjectRegistry — get() + findByDCSType()
--- Module  : P1 (src/lib/CTLD_objectRegistry.lua)
+-- Module  : P1 (src/core/CTLD_objectRegistry.lua)
 -- Objectif: Vérifier lookups directs et reverse lookup par DCS typeName
 -- ============================================================
 
 do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end
 
 dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/setup.lua")
-dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/lib/CTLD_objectRegistry.lua")
+dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/core/CTLD_objectRegistry.lua")
 
 ctld_test.start("U-54", "CTLDObjectRegistry get() + findByDCSType()")
 

@@ -9,7 +9,7 @@ do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log
 dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/setup.lua")
 
 dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/CTLD_core.lua")
-dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/lib/CTLDParachuteEffect.lua")
+dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/core/CTLDParachuteEffect.lua")
 dofile("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/CTLD_troop.lua")
 
 ctld_test.start("U-35", "CTLDTroopGroup entity — init + états + transitions")
