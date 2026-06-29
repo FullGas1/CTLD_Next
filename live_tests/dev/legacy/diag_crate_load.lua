@@ -2,7 +2,7 @@
 -- scenarios/diag_crate_load.lua
 -- Écriture directe dans CTLD.log via io (contexte DCS Witchcraft)
 
-local LOG = "C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log"
+local LOG = (ctld and ctld.path or "") .. "CTLD.log"
 local function log(msg)
     local f = io.open(LOG, "a")
     if f then f:write(msg .. "\n"); f:close() end

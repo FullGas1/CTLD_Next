@@ -1,12 +1,12 @@
 ---@diagnostic disable
 -- diag_loader.lua : charge les fichiers src/ un par un et détecte le crash
-do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end
+do local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"w") if f then f:close() end end
 
-local BASE = "C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/src/"
+local BASE = ((ctld and ctld.path or "") .. "src/")
 
 local function log(msg)
     env.info("[CTLD-LOADER] " .. tostring(msg))
-    local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","a")
+    local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"a")
     if f then f:write("[LOADER] " .. tostring(msg) .. "\n") f:close() end
 end
 

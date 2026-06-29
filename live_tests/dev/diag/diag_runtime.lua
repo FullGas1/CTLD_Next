@@ -1,10 +1,10 @@
 ---@diagnostic disable
 -- Diagnostic : état CTLD au runtime
-do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end
+do local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"w") if f then f:close() end end
 
 local function log(msg)
     env.info("[CTLD-DIAG] " .. tostring(msg))
-    local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","a")
+    local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"a")
     if f then f:write("[DIAG] " .. tostring(msg) .. "\n") f:close() end
 end
 

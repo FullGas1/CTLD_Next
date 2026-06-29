@@ -3,12 +3,12 @@
 -- Injecte via Witchcraft dans une mission DCS avec CTLD chargé.
 -- Détecte à quelle étape de ctld.initialize() le crash se produit.
 
-do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end
+do local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"w") if f then f:close() end end
 
 local results = {}
 local function log(msg)
     env.info("[CTLD-BOOT] " .. tostring(msg))
-    local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","a")
+    local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"a")
     if f then f:write("[BOOT] " .. tostring(msg) .. "\n") f:close() end
     table.insert(results, msg)
 end

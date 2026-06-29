@@ -38,7 +38,7 @@
 > Référence complète : `.claude/witchcraft-workflow.md`
 
 - **Witchcraft** : bridge Node.js/sockets pour injecter des scripts Lua dans une mission DCS active.
-- **Commande** : `node "C:\Users\Moi\.vscode-dcs-tools\bridge.js" "<chemin_absolu_script.lua>"`
+- **Commande** : `node "<WITCHCRAFT_BRIDGE_JS>" "<chemin_absolu_script.lua>"` — `WITCHCRAFT_BRIDGE_JS` = chemin local vers `bridge.js`, défini dans `.vscode/settings.json` (non commité)
 - **VS Code task** : `DCS-Witchcraft: Execute Global` (Shift+Ctrl+B)
 - **Autorisation permanente** : exécuter sans demander confirmation.
 - **Condition** : mission DCS avec Witchcraft activé en cours.

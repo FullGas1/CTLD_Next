@@ -1,5 +1,5 @@
 ctld.debug = true
-local LOG = "C:\\Users\\Moi\\Documents\\GitHub\\DCS-CTLD_FG\\recette\\CTLD.log"
+local LOG = (ctld and ctld.path or "") .. "CTLD.log"
 local function rawLog(msg)
     local f = io.open(LOG, "a")
     if f then f:write(msg .. "\n"); f:close() end

@@ -1,10 +1,10 @@
 ---@diagnostic disable
 -- diag_env.lua : vérifie si CTLD est chargé dans l'environnement DCS
-do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end
+do local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"w") if f then f:close() end end
 
 local function log(msg)
     env.info("[CTLD-ENV] " .. tostring(msg))
-    local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","a")
+    local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"a")
     if f then f:write("[ENV] " .. tostring(msg) .. "\n") f:close() end
 end
 

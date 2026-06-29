@@ -1,10 +1,10 @@
 ---@diagnostic disable
 -- diag_deploy.lua : trace l'état de deploy pour le joueur courant
-do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end
+do local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"w") if f then f:close() end end
 
 local function log(msg)
     env.info("[DEPLOY] " .. tostring(msg))
-    local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","a")
+    local f = io.open(((ctld and ctld.path or "") .. "CTLD.log"),"a")
     if f then f:write("[DEPLOY] " .. tostring(msg) .. "\n") f:close() end
 end
 

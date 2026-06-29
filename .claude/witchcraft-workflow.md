@@ -9,8 +9,8 @@
 
 | Élément | Valeur |
 |---------|--------|
-| Bridge Node.js | `C:\Users\Moi\.vscode-dcs-tools\bridge.js` |
-| Commande | `node "C:\Users\Moi\.vscode-dcs-tools\bridge.js" "<chemin_absolu_script.lua>"` |
+| Bridge Node.js | `<WITCHCRAFT_BRIDGE_JS>` (chemin local, non commité — ex: `C:\Users\<you>\.vscode-dcs-tools\bridge.js`) |
+| Commande | `node "<WITCHCRAFT_BRIDGE_JS>" "<chemin_absolu_script.lua>"` |
 | VS Code task | `DCS-Witchcraft: Execute Global` (Shift+Ctrl+B, utilise `${file}`) |
 | Condition | Mission DCS avec Witchcraft activé en cours |
 | Retour succès | `[SUCCESS] nil` (injection OK, script sans return) |
@@ -54,7 +54,7 @@ cfg.settings["debug"] = _saved_debug
 Pour que `ctld.utils.log` écrive dans `CTLD.log`, le chemin doit être défini **avant le démarrage de CTLD** :
 
 ```lua
-cfg.settings["ctldLogPath"] = "C:\\Users\\Moi\\Documents\\GitHub\\DCS-CTLD_FG\\recette\\"
+cfg.settings["ctldLogPath"] = ctld.path .. "live_tests\\"  -- ctld.path défini dans le trigger MISSION START du .miz
 ```
 
 > Ce chemin est **local à la machine**. Le définir via un trigger **MISSION START → DO SCRIPT FILE** dans le `.miz` de test. Ne jamais commiter ce chemin dans le repo.
@@ -94,11 +94,11 @@ if f then f:write(os.date() .. " " .. msg .. "\n"); f:close() end
 ## Lecture des logs
 
 ```powershell
-# CTLD.log — filtré par tag
-Get-Content "C:\Users\Moi\Documents\GitHub\DCS-CTLD_FG\recette\CTLD.log" | Select-String "[mon_tag]"
+# CTLD.log — filtré par tag  ($ctldLogPath = valeur de cfg.settings["ctldLogPath"])
+Get-Content "$ctldLogPath\CTLD.log" | Select-String "[mon_tag]"
 
 # Lecture complète
-Get-Content "C:\Users\Moi\Documents\GitHub\DCS-CTLD_FG\recette\CTLD.log"
+Get-Content "$ctldLogPath\CTLD.log"
 ```
 
 Chemins :
