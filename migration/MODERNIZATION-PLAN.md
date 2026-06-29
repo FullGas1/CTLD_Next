@@ -1401,6 +1401,92 @@ Minor cleanups identified — low priority, no functional impact.
     - i18n 4 langues (EN/FR/ES/KO) + MM guide mis à jour.
     - Recette warehouse_cycle : 3/3 PASS live DCS [2026-06-28] — crate présente, snapshot metadata, fuel restauré 5k/10k/15k/20k.
 
+## CI Recette Workflow — Architecture cible
+
+> Objectif : couvrir ≥60% des features principales en CI automatisé à chaque release.
+
+### Taxonomie des recettes (4 niveaux)
+
+| Niveau | Type | Dossier | Exécution | Outils |
+| --- | --- | --- | --- | --- |
+| **L1** | Busted unit | `tests/unit/` | CI automatique (GitHub Actions) | busted, dcs_stubs.lua |
+| **L2** | Busted functional | `tests/functional/` | CI automatique (GitHub Actions) | busted, dcs_stubs.lua |
+| **L3** | Witchcraft auto | `recette/scenarios/auto/` | Manuel + mission DCS headless (pas de joueur) | Witchcraft inject + CTLD.log |
+| **L4** | Witchcraft interactif | `recette/scenarios/interactive/` | Manuel + mission DCS + joueur humain | Witchcraft inject + F10 menu |
+
+> Les fichiers `recette/unit/` (U-*) et `recette/functional/` (F-*) au format Witchcraft restent comme **référence de couverture** — ils documentent ce qui doit être testé. Les `tests/unit/` et `tests/functional/` en sont l'implémentation CI.
+
+### Structure cible `tests/`
+
+```text
+tests/
+├── helpers/
+│   ├── dcs_stubs.lua       ← stubs DCS partagés (existant)
+│   ├── loader.lua          ← charge src/ dans l'ordre listToMerge (existant)
+│   └── init.lua            ← point d'entrée busted (existant)
+├── specs/                  ← existant — garder pour compatibilité
+│   └── crate_manager_test.lua
+├── unit/                   ← NOUVEAU — migration U-* en busted (*_spec.lua)
+│   └── *.spec.lua
+└── functional/             ← NOUVEAU — F-* sélectifs en busted (*_spec.lua)
+    └── *.spec.lua
+```
+
+### Sélection L1/L2 (candidats CI)
+
+**L1 — Unit (tous migrables)** : U-001→U-096, U-106→U-108
+Config, EventDispatcher, Zones, Crates, Troops, JTAC, Menu, Utils, i18n, ModValidator — ~105 tests
+
+**L2 — Functional sélectifs** (stubs suffisants, pas de spawn DCS réel) :
+F-033→F-040 (troop/JTAC lifecycle), F-057→F-071 (parachute/slingload),
+F-078→F-080 (utils), F-101→F-105 (config/i18n), F-115 (markIds),
+F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
+
+**Hors CI** (spawn DCS réel requis) : F-090, F-091, F-093 (scènes visuelles), F-081→F-082 (DCS F10 rendu), scenarios/*
+
+**Coverage estimée** : ~150 tests CI → **~65% des features principales**
+
+### Procédure de recette par niveau
+
+#### L1/L2 — CI busted (automatique)
+
+1. Push sur `master` ou `feature_*` → GitHub Actions déclenche job busted
+2. Job : `busted tests/` (pattern `_spec`)
+3. Résultat : PASS/FAIL dans PR checks
+4. Aucune action manuelle requise
+
+#### L3 — Witchcraft auto (mission DCS, pas de joueur)
+
+1. Lancer DCS en mode serveur/éditeur avec la mission de test `missions/Test_CTLDNEXT_01.miz`
+2. Activer Witchcraft (mission start)
+3. Injecter `recette/shutdown_ctld.lua` si CTLD déjà actif
+4. Injecter `CTLD_Next.lua` (après rebuild si src/ modifié)
+5. Attendre 3–5 s (init CTLD)
+6. Injecter le scénario `recette/scenarios/auto/scenario_xxx.lua`
+7. Lire `CTLD.log` : chercher `[PASS]` / `[FAIL]` / `[SUCCESS]`
+8. En cas d'échec : analyser le log, corriger, rebuildere et recommencer depuis l'étape 3
+
+#### L4 — Witchcraft interactif (mission DCS + joueur)
+
+1. Lancer DCS, charger mission, prendre un slot transport (ex. UH-1H)
+2. Activer Witchcraft
+3. Injecter `CTLD_Next.lua` + attendre init
+4. Injecter le scénario interactif
+5. Suivre les instructions affichées à l'écran (actions F10 menu, positionnement)
+6. Vérifier les messages outText + CTLD.log
+7. Valider visuellement (spawns, menus, effets)
+
+### TODOs
+
+- ⬜ **TODO-CI-1** : Déplacer les ~35 `diag_*` de `recette/` racine → `recette/dev/diag/`
+- ⬜ **TODO-CI-2** : Créer `tests/unit/` + `tests/functional/` + ajuster `.busted` pour scanner ces dossiers
+- ⬜ **TODO-CI-3** : Migrer U-001→U-096 en busted `tests/unit/*_spec.lua` (Option C — réécriture format, pas copie)
+- ⬜ **TODO-CI-4** : Migrer F-* sélectifs (~45) en busted `tests/functional/*_spec.lua`
+- ⬜ **TODO-CI-5** : Étendre `.github/workflows/ci.yml` — job busted sur `tests/unit/` + `tests/functional/`
+- ⬜ **TODO-CI-6** : Documenter la procédure L3/L4 dans `docs/dev-guide.md` §Testing
+
+---
+
 ## Risks and mitigations
 
 | Risk | Impact | Mitigation |
