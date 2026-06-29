@@ -110,11 +110,12 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────────────────────
-  # Job 3 — busted unit tests (tests/specs/**/*_spec.lua)
+  # Job 3 — busted tests (tests/**/*_spec.lua)
+  # Covers: tests/specs/ (existing), tests/unit/ (L1), tests/functional/ (L2).
   # Runs entirely without DCS — DCS API is stubbed in tests/helpers/.
   # ─────────────────────────────────────────────────────────────
   busted:
-    name: busted Unit Tests
+    name: busted Tests
     runs-on: windows-latest
 
     steps:
@@ -128,7 +129,7 @@ jobs:
         shell: pwsh
 
       - name: Run busted
-        run: busted tests/specs/
+        run: busted tests/
         shell: pwsh
 
   # ─────────────────────────────────────────────────────────────

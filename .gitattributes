@@ -1,0 +1,13 @@
+# ── Line endings ─────────────────────────────────────────────
+* text=auto
+
+# ── Export-ignore: dev-only dirs excluded from git archive / release zip ──
+src/            export-ignore
+tools/          export-ignore
+tests/          export-ignore
+live_tests/     export-ignore
+migration/      export-ignore
+.github/        export-ignore
+.claude/        export-ignore
+.vscode/        export-ignore
+docs/assets/    export-ignore
