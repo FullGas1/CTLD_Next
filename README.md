@@ -2,8 +2,6 @@
 
 Complete Troops and Logistics Deployment for DCS World — **v2 modular rewrite**
 
-> **Migration from v1?** See the [Migration from v1](#migration-from-v1) section below.
-
 ---
 
 ## License
