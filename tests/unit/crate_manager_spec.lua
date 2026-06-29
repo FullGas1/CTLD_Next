@@ -408,3 +408,131 @@ describe("CTLDCrateManager checkAssemblyReady", function()
     end)
 
 end)
+
+-- ─────────────────────────────────────────────────────────────
+describe("CTLDCrateManager findDescriptorByUnitType", function()
+    -- U-033
+
+    local cm
+
+    before_each(function()
+        cm = CTLDCrateManager.getInstance()
+        cm.crates = {}
+    end)
+
+    it("returns descriptor for a known unit type (M-1 Abrams)", function()
+        local d = cm:findDescriptorByUnitType("M-1 Abrams")
+        assert.is_not_nil(d)
+        assert.equals(4, d.cratesRequired)
+    end)
+
+    it("returns descriptor for a single-crate unit (cratesRequired nil)", function()
+        local d = cm:findDescriptorByUnitType("M1043 HMMWV Armament")
+        assert.is_not_nil(d)
+        assert.is_nil(d.cratesRequired)
+    end)
+
+    it("returns nil for unknown unit type", function()
+        assert.is_nil(cm:findDescriptorByUnitType("NonExistentUnit"))
+    end)
+
+    it("returns nil for nil input", function()
+        assert.is_nil(cm:findDescriptorByUnitType(nil))
+    end)
+
+end)
+
+-- ─────────────────────────────────────────────────────────────
+describe("CTLDCrateManager spawnCrate", function()
+    -- U-083
+
+    local cm
+    local spawnedStatics, origAddStatic, origGetByName, origGetAbsTime
+
+    before_each(function()
+        cm = CTLDCrateManager.getInstance()
+        cm.crates = {}
+
+        spawnedStatics = {}
+
+        origAddStatic  = coalition.addStaticObject
+        origGetByName  = StaticObject.getByName
+        origGetAbsTime = timer.getAbsTime
+
+        -- Capture addStaticObject calls and return a mock object
+        coalition.addStaticObject = function(cId, data)
+            spawnedStatics[data.name] = { countryId = cId, data = data }
+            return { getName = function() return data.name end }
+        end
+
+        -- Return stub when name matches a spawned static
+        StaticObject.getByName = function(name)
+            return spawnedStatics[name] and { _name = name } or nil
+        end
+
+        timer.getAbsTime = function() return 100 end
+    end)
+
+    after_each(function()
+        coalition.addStaticObject = origAddStatic
+        StaticObject.getByName    = origGetByName
+        timer.getAbsTime          = origGetAbsTime
+    end)
+
+    it("returns a CTLDCrate with correct fields", function()
+        local d    = cm:findDescriptorByUnitType("M1043 HMMWV Armament")
+        local pos  = { x = 100, y = 10, z = 200 }
+        local crate = cm:spawnCrate(d, pos, coalition.side.BLUE, "pilot1", "crate_spawn")
+        assert.is_not_nil(crate)
+        assert.is_not_nil(crate.crateName)
+        assert.equals(coalition.side.BLUE, crate.coalition)
+        assert.equals("pilot1",            crate.spawnedBy)
+        assert.equals("crate_spawn",       crate.spawnMethod)
+        assert.equals(pos,                 crate.position)
+    end)
+
+    it("coalition.addStaticObject called with correct position and mass", function()
+        local d    = cm:findDescriptorByUnitType("M1043 HMMWV Armament")
+        local pos  = { x = 100, y = 10, z = 200 }
+        local crate = cm:spawnCrate(d, pos, coalition.side.BLUE, nil, "crate_spawn")
+        local sd = crate and spawnedStatics[crate.crateName]
+        assert.is_not_nil(sd)
+        assert.equals(100,      sd.data.x)
+        assert.equals(200,      sd.data.y)   -- DCS y = world z
+        assert.equals(d.weight, sd.data.mass)
+        assert.equals("Cargos", sd.data.category)
+    end)
+
+    it("crate is registered in manager.crates", function()
+        local d    = cm:findDescriptorByUnitType("M1043 HMMWV Armament")
+        local crate = cm:spawnCrate(d, { x=0, y=0, z=0 }, coalition.side.BLUE, nil, "crate_spawn")
+        assert.is_not_nil(crate)
+        assert.is_not_nil(cm.crates[crate.crateName])
+    end)
+
+    it("publishes OnCrateSpawned event", function()
+        local fired = {}
+        EventDispatcher.getInstance():subscribe("OnCrateSpawned", function(evt)
+            table.insert(fired, evt)
+        end)
+        local d    = cm:findDescriptorByUnitType("M1043 HMMWV Armament")
+        local crate = cm:spawnCrate(d, { x=0, y=0, z=0 }, coalition.side.BLUE, nil, "crate_spawn")
+        assert.is_not_nil(crate)
+        assert.equals(1,               #fired)
+        assert.equals(crate.crateName, fired[1].crateName)
+    end)
+
+    it("dynamic modelKey sets canCargo=true", function()
+        local d    = cm:findDescriptorByUnitType("M1043 HMMWV Armament")
+        local crate = cm:spawnCrate(d, { x=0, y=0, z=0 }, coalition.side.RED,
+            nil, "vehicle_pack", country.id.RUSSIA, "dynamic")
+        assert.is_not_nil(crate)
+        local sd = spawnedStatics[crate.crateName]
+        assert.is_true(sd.data.canCargo)
+    end)
+
+    it("returns nil for nil descriptor", function()
+        assert.is_nil(cm:spawnCrate(nil, { x=0, y=0, z=0 }, coalition.side.BLUE, nil, "crate_spawn"))
+    end)
+
+end)

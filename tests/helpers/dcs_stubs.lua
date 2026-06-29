@@ -39,6 +39,15 @@ country = {
         FRANCE      = 14,
         UKRAINE     = 51,
     },
+    -- Reverse map: integer id → name string (used by ctld.utils.dynAddStatic)
+    name = {
+        [2]  = "USA",
+        [0]  = "RUSSIA",
+        [4]  = "GERMANY",
+        [8]  = "UK",
+        [14] = "FRANCE",
+        [51] = "UKRAINE",
+    },
 }
 
 -- ── Group ────────────────────────────────────────────────────
