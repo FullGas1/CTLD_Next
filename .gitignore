@@ -10,3 +10,6 @@
 # Diagnostic probes are in recette/dev/diag/ (tracked).
 # If you create personal scratch scripts, put them here and they will be ignored:
 recette/scratch/
+
+# ── IDE / editor local config (machine-specific paths) ───────────────────────
+.vscode/settings.json
