@@ -521,7 +521,19 @@ describe("F-065/F-066/F-067 — canSlingload menu", function()
             local cm = CTLDCrateManager.getInstance()
 
             -- Inject a slingloaded crate for this transport
-            local fakeTransport = { getName = function() return "UH-1H-1" end }
+            local fakeTransport = {
+                getName     = function() return "UH-1H-1" end,
+                isExist     = function() return true end,
+                getPoint    = function() return { x=0, y=50, z=0 } end,
+                getVelocity = function() return { x=0, y=0, z=0 } end,
+            }
+            -- Mock Unit.getByName so refreshCrateFlightSection sees the in-air transport
+            local _origGetByName = Unit.getByName
+            Unit.getByName = function(n)
+                if n == "UH-1H-1" then return fakeTransport end
+                return _origGetByName and _origGetByName(n) or nil
+            end
+
             local crate = CTLDCrate:new({
                 crateName   = "sl_crate_F67",
                 descriptor  = { unit="Ammo_Crate", cratesRequired=1, weight=300 },
@@ -535,10 +547,12 @@ describe("F-065/F-066/F-067 — canSlingload menu", function()
             crate.loadedBy             = fakeTransport
             cm.crates["sl_crate_F67"]  = crate
 
-            -- Re-run flight section to update visibility
+            -- Re-run flight section to update visibility (ctld.utils.inAir is mocked to return true)
             local playerObj = { unitName="UH-1H-1", groupId=9901, typeName="UH-1H",
                                  isTransport=true, coalition=2 }
             cm:refreshCrateFlightSection(playerObj)
+
+            Unit.getByName = _origGetByName  -- restore
 
             local node = menu and menu:_getNode({ ctld.tr("CTLD"), ctld.tr("Crate Commands"),
                                                   ctld.tr("Release Slingload") })
