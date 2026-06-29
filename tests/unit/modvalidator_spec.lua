@@ -13,7 +13,7 @@ if not _thisFile then _thisFile = "" end  -- relative path: cwd is repo root
 -- ─────────────────────────────────────────────────────────────
 describe("CTLDModValidator", function()
 
-    before_all(function()
+    setup(function()
         dofile(_thisFile .. "src/core/CTLD_modValidator.lua")
     end)
 

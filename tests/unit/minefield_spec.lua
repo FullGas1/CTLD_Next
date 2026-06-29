@@ -14,7 +14,7 @@ describe("mineFieldScene", function()
     -- Load the scene file once before any test.
     -- CTLDSceneManager, CTLDObjectRegistry and CTLDPlayerManager
     -- are already available via tests/helpers/loader.lua.
-    before_all(function()
+    setup(function()
         -- Reset singleton so scene registration is clean
         _smInstance = nil
         dofile(_thisFile .. "src/scenes/CTLD_mineFieldScene.lua")
