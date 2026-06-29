@@ -1,20 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls -la source_futur/*[Cc]rate*)",
+      "Bash(*)",
       "WebFetch(domain:wiki.hoggitworld.com)",
-      "Bash(sed -i 's/repackRequestsStack/packRequestsStack/g' CTLD_core.lua)",
-      "Bash(sed -i 's/updateRepackMenuOnlanding/updatePackMenuOnlanding/g' CTLD_core.lua)",
-      "Bash(sed -i 's/autoUpdateRepackMenu/autoUpdatePackMenu/g' CTLD_core.lua)",
-      "Bash(sed -i 's/getUnitsInRepackRadius/getUnitsInPackRadius/g' CTLD_core.lua)",
-      "Bash(sed -i 's/maximumDistanceRepackableUnitsSearch/maximumDistancePackableUnitsSearch/g' CTLD_core.lua)",
-      "Bash(sed -i 's/repackableUnits/packableUnits/g' CTLD_core.lua)",
-      "Bash(sed -i 's/repackableUnit/packableUnit/g' CTLD_core.lua)",
-      "Bash(sed -i 's/isRepackableUnit/isPackableUnit/g' CTLD_core.lua)",
-      "Bash(sed -i 's/repackVehicleRequest/packVehicleRequest/g' CTLD_core.lua)",
-      "Bash(sed -i 's/repackVehicle/packVehicle/g' CTLD_core.lua)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "WebFetch(domain:github.com)"
     ],
     "additionalDirectories": [
       "\\tmp"
