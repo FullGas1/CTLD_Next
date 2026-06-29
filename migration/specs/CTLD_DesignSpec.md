@@ -1195,7 +1195,6 @@ Récapitulatif des paginations :
 |---|---|
 | `listToMerge.txt` | Liste ordonnée des fichiers source à fusionner |
 | `merge.sh` | Script de fusion : concatène les fichiers → `CTLD.lua` |
-| `CTLD_loader.lua` | Chargeur DCS alternatif (dofile par module, pour debug) |
 
 **Ordre de fusion (`listToMerge.txt`)** :
 ```

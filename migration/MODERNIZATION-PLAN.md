@@ -871,7 +871,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
         Triggers : push sur master + feature_* , PR vers master
 ✅  Q4a Réorganisation arborescence repo  [2026-04-15]
         Suppressions : old/, merger/ (V1), src/tests/, conversation.text, witchcraft_test.lua
-        Déplacements : build/ → tools/build/, CTLD_loader.lua → tools/,
+        Déplacements : build/ → tools/build/,
           documentation/ + Specs/ → docs/, *.ogg → assets/, *.png → docs/,
           *.miz → missions/, CTLD.lua (v1) → source/
         .gitignore : ajout CTLD_Next.lua
@@ -879,7 +879,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 ✅  Q4b source/ dead code cleanup  [2026-04-16]
         Supprimés : CTLD_beacon.lua, CTLD_config.lua, CTLD_core.lua, CTLD_i18n.lua,
           CTLD_jtac.lua, CTLD_menu.lua, CTLD_recon.lua, CTLD_utils.lua, load_event.lua
-        Conservés : CTLD.lua (référence v1 complète), CTLD_userConfig.lua, CTLD_loader.lua
+        Conservés : CTLD.lua (référence v1 complète), CTLD_userConfig.lua
 ✅  Q5  documentation complète  [2026-04-15]
         ✅  Q5-A  docs/missionmaker_guide.md — guide complet  [2026-04-15]
                    §1–9 existants + §10 Crates + §11 Vehicles + §12 FOB + §13 Beacons
@@ -935,7 +935,6 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 
 - `tools/build/merge_CTLD.ps1`: concatenates `src/` → `CTLD_Next.lua`
 - `tools/build/listToMerge.txt`: canonical load order
-- `tools/build/generate_loader.ps1`: generates `CTLD_loader.lua` for dev
 - `tools/build/generate_i18n_dicts.ps1`: syncs i18n keys across languages
 
 ---
@@ -944,7 +943,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 
 Removed 9 redundant partial files (CTLD_beacon, CTLD_config, CTLD_core, CTLD_i18n, CTLD_jtac,
 CTLD_menu, CTLD_recon, CTLD_utils, load_event). Retained 3 reference files:
-`source/CTLD.lua` (full v1 monolith), `source/CTLD_userConfig.lua`, `source/CTLD_loader.lua`.
+`source/CTLD.lua` (full v1 monolith), `source/CTLD_userConfig.lua`.
 
 ---
 

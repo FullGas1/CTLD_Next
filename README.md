@@ -105,9 +105,9 @@ Reach out to [Zip on Discord](https://discordapp.com/users/421317390807203850) t
 
 For live development without rebuilding the `.miz` each time:
 
-1. Set `CTLD_SOURCE_PATH` in `tools/CTLD_loader.lua` to the absolute path of your local `src/` directory.
-2. In the Mission Editor, add a **DO SCRIPT FILE** trigger pointing to `tools/CTLD_loader.lua`.
-3. Reload the mission in DCS (`Left Shift + R`) after editing source files.
+1. Run `tools/build/merge_CTLD.ps1` after each source edit to regenerate `CTLD_Next.lua`.
+2. Place `CTLD_Next.lua` in a fixed local path and use a `DO SCRIPT` trigger with `dofile("your/path/CTLD_Next.lua")`.
+3. Reload the mission in DCS (`Left Shift + R`) — no `.miz` re-packaging needed.
 
 ### Required sound files
 

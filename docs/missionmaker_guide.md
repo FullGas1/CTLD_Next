@@ -52,7 +52,7 @@ Your triggers must fire in this order:
 | Order | Action | File |
 |---|---|---|
 | 1 | DO SCRIPT FILE | `CTLD_userConfig.lua` |
-| 2 | DO SCRIPT FILE | `CTLD.lua` (or `CTLD_loader.lua` in dev) |
+| 2 | DO SCRIPT FILE | `CTLD_Next.lua` |
 
 ### Customising parameters — `CTLD_userConfig.lua`
 
