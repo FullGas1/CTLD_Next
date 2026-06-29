@@ -1,7 +1,7 @@
 ---@diagnostic disable
 -- ============================================================
 -- F-96 : Legacy API — Crates wrappers (3 functions) + spawnCrate now functional
--- Module  : Q1 (src/compat/legacy_api.lua → src/CTLD_crate.lua)
+-- Module  : Q1 (src/legacy/legacy_api.lua → src/CTLD_crate.lua)
 -- ============================================================
 
 do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end

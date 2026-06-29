@@ -1,5 +1,5 @@
 -- ============================================================
--- src/compat/legacy_api.lua
+-- src/legacy/legacy_api.lua
 -- Legacy API compatibility wrappers — CTLD v1 → v2
 --
 -- Provides the original ctld.* function signatures used in

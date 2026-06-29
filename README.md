@@ -1092,7 +1092,7 @@ local ok, result = mineFieldScene.setLandMineAuto(Unit.getByName("helo1"), 30, 5
 
 ## Migration from v1
 
-All 22 legacy `ctld.*` functions are preserved as thin wrappers in `src/compat/legacy_api.lua`. Each wrapper logs a deprecation warning and delegates to the equivalent v2 manager method. **Existing missions continue to work without changes.**
+All 22 legacy `ctld.*` functions are preserved as thin wrappers in `src/legacy/legacy_api.lua`. Each wrapper logs a deprecation warning and delegates to the equivalent v2 manager method. **Existing missions continue to work without changes.**
 
 Selected migration table (full table in [`docs/dev-guide.md`](docs/dev-guide.md)):
 

@@ -280,7 +280,7 @@ mineFieldScene.clearSet(1)
 
 ## Legacy wrappers (ctld.*)
 
-All 22 v1 global functions are preserved in `src/compat/legacy_api.lua` as thin wrappers. Existing missions continue to work unchanged. Each wrapper logs a deprecation warning.
+All 22 v1 global functions are preserved in `src/legacy/legacy_api.lua` as thin wrappers. Existing missions continue to work unchanged. Each wrapper logs a deprecation warning.
 
 | v1 call | v2 equivalent |
 |---------|--------------|

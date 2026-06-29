@@ -20,7 +20,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 | 1 | Module split | ✅ **Done** — `src/` files concatenated → `CTLD_Next.lua` by `tools/build/merge_CTLD.ps1`. Order: `tools/build/listToMerge.txt` |
 | 2 | OOP | ✅ **Done** — `src/lib/class.lua` created (P1). All entity classes refactored. |
 | 3 | MIST | ✅ **Done** — all `mist.*` calls replaced by `ctld.utils.*`. No active `mist.*` call in `src/` |
-| 4 | Legacy API | ✅ **Done** — `src/compat/legacy_api.lua` (22 wrappers, thin delegates) [2026-04-15] |
+| 4 | Legacy API | ✅ **Done** — `src/legacy/legacy_api.lua` (22 wrappers, thin delegates) [2026-04-15] |
 | 5 | Lua env | Lua 5.1 DCS sandbox, desanitized server (`io`, `os`, `lfs` accessible) |
 | 6 | Testing | ✅ **Done** — busted infrastructure in `tests/helpers/` + `tests/specs/` + CI job [2026-04-15] |
 | 7 | Docs | ✅ **Done** — `docs/missionmaker_guide.md` (§1–16) + `docs/dev-guide.md` [2026-04-15] |
@@ -42,7 +42,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
 | **1** | Dead code cleanup (`source/`) | ✅ Done — 9 fichiers redondants supprimés, 3 références conservées [2026-04-16] |
 | **2** | Module split + OOP (`src/`) | ✅ 100% — impl + recette + Q1–Q5 ✅ [2026-04-16] |
 | **3** | MIST middleware | ✅ Done |
-| **4** | Legacy API compatibility | ✅ Done — src/compat/legacy_api.lua, 22 wrappers [2026-04-15] |
+| **4** | Legacy API compatibility | ✅ Done — src/legacy/legacy_api.lua, 22 wrappers [2026-04-15] |
 | **5** | Unit tests (busted) | ✅ Infrastructure done — tests/helpers/ + tests/specs/ + CI job [2026-04-15] |
 | **6** | CI infrastructure | ✅ Done — `.github/workflows/ci.yml` (lint + build + busted + release + docs) [2026-04-16] |
 | **7** | i18n cleanup + tooling | ✅ Done |
@@ -835,7 +835,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
         Lien ajouté dans missionmaker_guide.md §5 (Troop Transport).
 
 ── APRÈS PHASE 2 COMPLÈTE ───────────────────────────────────────────────────
-✅  Q1  src/compat/legacy_api.lua  [2026-04-15]
+✅  Q1  src/legacy/legacy_api.lua  [2026-04-15]
         22 wrappers (Troops×6, Zones×10, Crates×3, Beacons×1, JTAC×3) — thin delegates
         Bugfix: CTLDTroopManager:deploy() exzZone.flagName → exzZone.objectiveFlag
         New: CTLDZoneManager:isUnitInZone() (méthode manquante appelée par deploy)
@@ -1021,7 +1021,7 @@ Remaining "mist" occurrences in source are string literals in log messages only.
 
 ## Phase 4 — Legacy API compatibility ✅ COMPLETE [2026-04-15]
 
-22 wrappers in `src/compat/legacy_api.lua`. Migration guide in `docs/dev-guide.md` §7.
+22 wrappers in `src/legacy/legacy_api.lua`. Migration guide in `docs/dev-guide.md` §7.
 Each wrapper logs a deprecation warning and delegates to the v2 manager.
 
 ---

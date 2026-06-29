@@ -10,7 +10,7 @@
 - **Commit style**: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`).
 - **Build target**: Individual source modules in `src/` are concatenated into a single `dist/CTLD.lua` deliverable by a build script. Never edit the built file directly.
 - **MIST dependency**: CTLD code must never call `mist.*` directly. All MIST usage goes through the middleware layer (`src/mist_compat/`).
-- **Legacy API**: When refactoring a public `ctld.*` function, always create a deprecated wrapper in `src/compat/legacy_api.lua` that logs a warning and delegates to the new API.
+- **Legacy API**: When refactoring a public `ctld.*` function, always create a deprecated wrapper in `src/legacy/legacy_api.lua` that logs a warning and delegates to the new API.
 - **Refer to the modernization plan**: See `.github/MODERNIZATION-PLAN.md` for the full roadmap and architectural decisions.
 
 ## Project context

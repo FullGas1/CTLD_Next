@@ -1,7 +1,7 @@
 ---@diagnostic disable
 -- ============================================================
 -- F-95 : Legacy API — Zones wrappers (10 functions)
--- Module  : Q1 (src/compat/legacy_api.lua → src/CTLD_zone.lua)
+-- Module  : Q1 (src/legacy/legacy_api.lua → src/CTLD_zone.lua)
 -- ============================================================
 
 do local f = io.open("C:/Users/Moi/Documents/GitHub/DCS-CTLD_FG/recette/CTLD.log","w") if f then f:close() end end

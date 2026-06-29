@@ -349,7 +349,7 @@ Results in `live_tests/CTLD.log`.
 ### 7.1 Wrapper principle
 
 All 22 v1 global functions (`ctld.spawnGroupAtTrigger`, `ctld.JTACAutoLase`,
-etc.) are preserved as thin wrappers in `src/compat/legacy_api.lua`. Each
+etc.) are preserved as thin wrappers in `src/legacy/legacy_api.lua`. Each
 wrapper:
 - Calls the equivalent v2 manager method
 - Logs a deprecation warning to `ctld.log`

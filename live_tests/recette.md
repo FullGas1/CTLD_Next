@@ -432,4 +432,4 @@ Scripts multi-injections exécutés via Witchcraft en mission réelle. Chaque sc
 | ~~**CTLD_farpScene.lua**~~ | ~~`src/scenes/CTLD_farpScene.lua`~~ | ~~Moyenne~~ | ✅ Recette complète [2026-04-14] — F-91 22/22 PASS (bugfix stepsDatas→steps) |
 | ~~**CTLD_fobScene.lua**~~ | ~~`src/scenes/CTLD_fobScene.lua`~~ | ~~Moyenne~~ | ✅ Recette complète [2026-04-14] — F-90 18/18 PASS |
 | ~~**Feature D — LoadableGroups**~~ | ~~`src/CTLD_troop.lua`~~ | ~~Haute~~ | ✅ Recette complète [2026-04-14] — U-76→U-80 + F-88→F-89 |
-| ~~**Q1 — Legacy API**~~ | ~~`src/compat/legacy_api.lua`~~ | ~~Haute~~ | ✅ Implémenté + recetté [2026-04-15] — 22 wrappers + packVehicle + spawnCrate, U-81→U-83 + F-94→F-99, 148/148 PASS |
+| ~~**Q1 — Legacy API**~~ | ~~`src/legacy/legacy_api.lua`~~ | ~~Haute~~ | ✅ Implémenté + recetté [2026-04-15] — 22 wrappers + packVehicle + spawnCrate, U-81→U-83 + F-94→F-99, 148/148 PASS |
