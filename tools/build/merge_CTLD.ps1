@@ -1,0 +1,66 @@
+# merge_CTLD.ps1 - Local build script for CTLD_Next.lua
+# Output: UTF-8 WITHOUT BOM (required by DCS Lua engine).
+# Compatible with PowerShell 5 and 7.
+# Usage: powershell -ExecutionPolicy Bypass -File tools/build/merge_CTLD.ps1
+
+$ErrorActionPreference = "Stop"
+
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot  = Resolve-Path (Join-Path $scriptDir "..\..")
+$listFile  = Join-Path $scriptDir "listToMerge.txt"
+$srcDir    = Join-Path $repoRoot  "src"
+$outFile   = Join-Path $repoRoot  "CTLD_Next.lua"
+
+# UTF-8 without BOM encoder (works on PS 5 and PS 7)
+$utf8NoBOM = [System.Text.UTF8Encoding]::new($false)
+
+# Accumulate all output in a StringBuilder for a single write
+$sb = [System.Text.StringBuilder]::new()
+
+$null = $sb.AppendLine('---@meta')
+$null = $sb.AppendLine('---@diagnostic disable')
+$null = $sb.AppendLine('')
+
+$warnings = 0
+$merged   = 0
+
+foreach ($line in (Get-Content $listFile)) {
+    # Skip comment lines and blank lines
+    if ($line -match '^\s*(--|$)') { continue }
+
+    $file = Join-Path $srcDir $line
+    if (-not (Test-Path $file)) {
+        Write-Host "[WARNING] File not found in src/: $line"
+        $warnings++
+        continue
+    }
+
+    $null = $sb.AppendLine('-- ====================================================================================================')
+    $null = $sb.AppendLine("-- Start : $line")
+    $null = $sb.AppendLine([System.IO.File]::ReadAllText($file))
+    $null = $sb.AppendLine("-- End : $line")
+    $merged++
+}
+
+# Single write - UTF-8 without BOM
+[System.IO.File]::WriteAllText($outFile, $sb.ToString(), $utf8NoBOM)
+
+$size = (Get-Item $outFile).Length
+Write-Host ""
+Write-Host "Merged  : $merged file(s)"
+if ($warnings -gt 0) { Write-Host "Skipped : $warnings file(s) not found (warnings only)" }
+Write-Host "Output  : $outFile ($size bytes)"
+
+if ($merged -eq 0) {
+    Write-Host "[ERROR] No files were merged - output is empty."
+    exit 1
+}
+
+# Verify no BOM
+$bytes = [System.IO.File]::ReadAllBytes($outFile)
+if ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+    Write-Host "[ERROR] BOM detected in output - aborting."
+    exit 1
+}
+
+Write-Host "OK - no BOM detected."

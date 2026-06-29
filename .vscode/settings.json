@@ -1,0 +1,60 @@
+{
+    /* --- 1. GESTION DES FICHIERS (EXCLUSIONS) --- */
+    // Permet de voir CTLD.lua à gauche mais de l'ignorer dans les recherches textuelles (Ctrl+Shift+F)
+    "search.exclude": {
+        "**/CTLD.lua": true
+    },
+
+    /* --- 2. CONFIGURATION LUA (DCS & ANALYSE) --- */
+    "Lua.runtime.version": "Lua 5.1",
+    
+    // Branchement de votre bibliothèque de définitions DCS
+    "Lua.workspace.library": [
+        "F:/LUA_scripting_travail/dcs-lua-definitions-master/library"
+    ],
+    "Lua.workspace.scanSubmodules": false,
+
+    // INDISPENSABLE : Empêche l'extension de scanner CTLD.lua pour Shift+F12
+    "Lua.workspace.ignoreDir": [
+        "CTLD.lua",
+        "**/CTLD.lua",
+        "./CTLD.lua"
+    ],
+
+    "Lua.workspace.checkThirdParty": false,
+    "Lua.workspace.preloadFileSize": 5000,
+
+    /* --- 3. DIAGNOSTICS ET ALERTES --- */
+    "Lua.diagnostics.globals": [
+        "ctld",
+        "mist",
+        "timer",
+        "trigger",
+        "coalition",
+        "env",
+        "land",
+        "world",
+        "Group",
+        "Unit",
+        "StaticObject"
+    ],
+    "Lua.diagnostics.disable": [
+        "undefined-field",
+        "undefined-global"
+    ],
+    // Force la disparition des alertes même sur les fichiers ouverts
+    "Lua.diagnostics.neededFileStatus": {
+        "undefined-field": "None",
+        "undefined-global": "None"
+    },
+
+    /* --- 4. ÉDITEUR ET PLIAGE (FOLDING) --- */
+    "editor.foldingImportsControls": false,
+    
+    "[lua]": {
+        "editor.foldingStrategy": "indentation",
+        "editor.preferredFoldingRangeProvider": null,
+        "editor.suggest.showKeywords": true,
+        "editor.formatOnPaste": true
+    }
+}

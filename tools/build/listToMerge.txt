@@ -1,0 +1,38 @@
+-- Core foundations (no business state)
+lib/class.lua
+CTLD_config.lua
+CTLD_i18n.lua
+CTLD_i18n_en.lua
+CTLD_i18n_fr.lua
+CTLD_i18n_es.lua
+CTLD_i18n_ko.lua
+CTLD_utils.lua
+CTLD_menu.lua
+lib/CTLD_objectRegistry.lua
+lib/CTLDParachuteEffect.lua
+lib/CTLD_modValidator.lua
+-- Business domain managers
+CTLD_sceneManager.lua
+CTLD_zone.lua
+CTLD_troop.lua
+CTLD_crate.lua
+CTLD_vehicle.lua
+CTLD_fob.lua
+CTLD_aasystem.lua
+CTLD_beacon.lua
+CTLD_recon.lua
+CTLD_jtac.lua
+CTLD_player.lua
+-- Scene data (after all managers defined, before CTLDCoreManager init so model.crate auto-injection runs correctly)
+scenes/CTLD_farpScene.lua
+scenes/CTLD_fobScene.lua
+scenes/CTLD_mineFieldScene.lua
+scenes/CTLD_countrysideFarpScene.lua
+scenes/CTLD_farpAlphaScene.lua
+scenes/CTLD_metalFarpScene.lua
+-- Orchestrator (instantiates all managers, including CTLDCrateManager._processSpawnableCrates)
+CTLD_core.lua
+-- Legacy API compatibility (after all managers)
+compat/legacy_api.lua
+-- User configuration (always last)
+CTLD_userConfig.lua
