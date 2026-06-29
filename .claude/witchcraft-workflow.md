@@ -9,8 +9,8 @@
 
 | Élément | Valeur |
 |---------|--------|
-| Bridge Node.js | `<WITCHCRAFT_BRIDGE_JS>` (chemin local, non commité — ex: `C:\Users\<you>\.vscode-dcs-tools\bridge.js`) |
-| Commande | `node "<WITCHCRAFT_BRIDGE_JS>" "<chemin_absolu_script.lua>"` |
+| Bridge Node.js | `${userHome}/.vscode-dcs-tools/bridge.js` (variable VS Code — définie dans `.vscode/tasks.json`) |
+| Commande | `node "${userHome}/.vscode-dcs-tools/bridge.js" "<chemin_absolu_script.lua>"` |
 | VS Code task | `DCS-Witchcraft: Execute Global` (Shift+Ctrl+B, utilise `${file}`) |
 | Condition | Mission DCS avec Witchcraft activé en cours |
 | Retour succès | `[SUCCESS] nil` (injection OK, script sans return) |
