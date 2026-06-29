@@ -20,6 +20,9 @@ ctldLogPath = (os.getenv("TEMP") or os.getenv("TMP") or "/tmp") .. "/"
 
 -- ── Core foundations ──────────────────────────────────────────
 dofile(SRC .. "core/class.lua")
+-- CTLDCrateAssemblyManager must exist before CTLDConfig:load() runs
+-- (load() sets CTLDCrateAssemblyManager.TEMPLATES). Only needs class().
+dofile(SRC .. "CTLD_aasystem.lua")
 dofile(SRC .. "CTLD_config.lua")
 
 -- Minimal i18n stub so ctld.tr() is available before CTLD_i18n loads
@@ -40,7 +43,7 @@ dofile(SRC .. "CTLD_troop.lua")
 dofile(SRC .. "CTLD_crate.lua")
 dofile(SRC .. "CTLD_vehicle.lua")
 dofile(SRC .. "CTLD_fob.lua")
-dofile(SRC .. "CTLD_aasystem.lua")
+-- CTLD_aasystem.lua already loaded above (before CTLDConfig:load)
 dofile(SRC .. "CTLD_beacon.lua")
 dofile(SRC .. "CTLD_recon.lua")
 dofile(SRC .. "CTLD_jtac.lua")
