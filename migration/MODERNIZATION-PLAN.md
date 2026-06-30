@@ -1104,7 +1104,7 @@ Rules: all player-visible strings use `ctld.tr()`. Key added to EN first, propag
 | Feature D (LoadableGroups) | ✅ | ✅ | ✅ | 100% | U-76→U-80 + F-88→F-89, 102/102 PASS [2026-04-14] |
 | Feature E (CTLD log) | ✅ | ✅ | ✅ | 100% | initLog/log/closeLog dans CTLD_utils.lua — validé via utils recette M9 [2026-04-09] |
 | **Troop + JTAC Lifecycle** (`src/CTLD_troop.lua`) | ✅ impl | ✅ spec | ✅ 8/8 | 100% | ✅ Terminologie rename + États rename + _aliveUnits/_jtacUnits + S_EVENT_DEAD sync + deregisterJTAC × N + multi-JTAC N× + orphan cleanup [2026-05-02]. Recette: `live_tests/scenarios/scenarioTroopsFullCycle_v2.lua` 8/8 PASS [2026-05-04] |
-| **Mise en conformité scénarios recette** | ✅ template | — | ⬜ 0% | — | Reformater tous les scénarios existants (`scenario_*.lua`, `scenarioTroopsFullCycle_A.lua`, etc.) pour conformité au nouveau template (pcall, check/assert, fail+traceback, log reset step 1, timer, return TAG+step+SUCCESS) — ⬜ pending [2026-05-04] |
+| **Mise en conformité scénarios recette** | ✅ template | — | ✅ 100% | 100% | ✅ 52 scénarios auto/ + interactive/ migrés au format v2 (Witchcraft guard, \_RUNNING guard, do..end, \_savedDebugScreenLog, clearview outText final). Template v2.0 créé. Validé DCS live : FR all pass, F181 all pass, F-SC 11/11, MT-12 OK, MT-05 11/12 [2026-06-30] |
 
 ---
 
