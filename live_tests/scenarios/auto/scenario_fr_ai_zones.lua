@@ -77,11 +77,27 @@
 -- Family        : auto
 -- =============================================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[FR] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_FR_RUNNING then
+    trigger.action.outText("[FR] already running.", 10)
+    return Witchcraft
+end
+_SCN_FR_RUNNING = true
+
+do  -- isolation scope
 trigger.action.outText("[FR] START — AI Zones Feature R+S", 8)
 
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local pass_n = 0
 local fail_n = 0
@@ -1048,11 +1064,15 @@ end
 -- Summary
 -- ══════════════════════════════════════════════════════════════════════════════
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 local total = pass_n + fail_n
 local msg = string.format("[FR] DONE — %d/%d PASS%s", pass_n, total,
     fail_n > 0 and (" | " .. fail_n .. " FAIL(S) — check CTLD.log") or " ✓")
-trigger.action.outText(msg, 30)
+trigger.action.outText(msg, 30, true)
 ctld.utils.log("INFO", msg)
 
+_SCN_FR_RUNNING = false
 return msg
+end  -- do isolation scope
+return Witchcraft

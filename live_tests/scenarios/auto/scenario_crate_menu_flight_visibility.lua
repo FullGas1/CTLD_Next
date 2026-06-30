@@ -15,11 +15,27 @@
 -- Family        : auto
 -- =============================================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[CMFV] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_CMFV_RUNNING then
+    trigger.action.outText("[CMFV] already running.", 10)
+    return Witchcraft
+end
+_SCN_CMFV_RUNNING = true
+
+do  -- isolation scope
 trigger.action.outText("[CMFV] START — Crate menu flight-state visibility", 8)
 
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local pass = 0
 local fail = 0
@@ -151,6 +167,7 @@ ctld.MenuManager.getInstance = _origMMGetInstance
 
 -- ── Final result ──────────────────────────────────────────────────────────────
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 local total = pass + fail
 local msg = string.format(
@@ -158,7 +175,10 @@ local msg = string.format(
     pass, total,
     fail > 0 and (" | " .. fail .. " FAIL — see CTLD.log") or ""
 )
-trigger.action.outText(msg, 15)
+trigger.action.outText(msg, 15, true)
 ctld.utils.log("INFO", msg)
 
+_SCN_CMFV_RUNNING = false
 return "TAG=CRATE_MENU_FLIGHT | steps=" .. total .. " | pass=" .. pass .. " | fail=" .. fail
+end  -- do isolation scope
+return Witchcraft

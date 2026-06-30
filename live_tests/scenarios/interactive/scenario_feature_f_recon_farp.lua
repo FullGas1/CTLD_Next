@@ -22,12 +22,20 @@
 --   F-158  CTLDStaticWatcher fires onDeadFn when checkFn returns false
 -- =============================================================================
 
+-- ── Witchcraft guard ─────────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[FARP] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
 local TAG  = "[FARP]"
 local STEP = "_FARP_STEP"
 
 local cfg         = CTLDConfig.get()
 local _saved_dbg  = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local function report(msg)
     ctld.utils.log("INFO", TAG .. " " .. msg)
@@ -264,9 +272,11 @@ end
 end)  -- pcall
 
 cfg.settings["debug"] = _saved_dbg
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 if not ok then
     ctld.utils.log("ERROR", TAG .. " step=" .. step .. " FAIL: " .. tostring(result))
     return TAG .. " step=" .. step .. " FAIL: " .. tostring(result)
 end
+trigger.action.outText(TAG .. " ✅ DONE", 20, true)
 return result

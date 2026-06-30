@@ -21,9 +21,17 @@
 -- =============================================================================
 
 -- ── DEBUG ACTIVATION ──────────────────────────────────────────────────────────
+
+-- ── Witchcraft guard ────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[JTAC-DRONE] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
 local cfg = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 -- ── METADATA ──────────────────────────────────────────────────────────────────
 local TAG   = "[DRONE]"
@@ -265,8 +273,10 @@ end)
 
 -- ── CLEANUP (debug always restored) ───────────────────────────────────────────
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 if not _ok then
     return TAG .. " FAIL: " .. tostring(_err)
 end
+trigger.action.outText(TAG .. " ✅ DONE", 20, true)
 return TAG .. " " .. _result

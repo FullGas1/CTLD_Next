@@ -1,3 +1,4 @@
+---@diagnostic disable
 -- ============================================================
 -- JTAC Toggle Lasing — recette automatique
 -- ============================================================
@@ -6,6 +7,20 @@
 -- Famille : auto (aucune intervention humaine)
 -- ============================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[F-TL] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_F_TL_RUNNING then
+    trigger.action.outText("[F-TL] already running.", 10)
+    return Witchcraft
+end
+_SCN_F_TL_RUNNING = true
+
+do  -- isolation scope
 trigger.action.outText("[F-TL] START — JTAC Toggle Lasing", 8)
 
 local JTAC_NAME  = "mock_jtac_tl"
@@ -108,5 +123,8 @@ mgr.startLase                    = _origStartLase
 local total = passed + failed
 local msg = string.format("[F-TL] %d/%d PASS", passed, total)
 if #failures > 0 then msg = msg .. " | FAIL: " .. table.concat(failures, ", ") end
-trigger.action.outText(msg, 12)
+trigger.action.outText(msg, 12, true)
+_SCN_F_TL_RUNNING = false
 return msg
+end  -- do isolation scope
+return Witchcraft

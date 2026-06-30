@@ -10,11 +10,27 @@
 -- Family        : auto
 -- =============================================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[FO] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_FO_RUNNING then
+    trigger.action.outText("[FO] already running.", 10)
+    return Witchcraft
+end
+_SCN_FO_RUNNING = true
+
+do  -- isolation scope
 trigger.action.outText("[FO] START — extractableGroups INIT-E", 8)
 
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local pass = 0
 local fail = 0
@@ -119,7 +135,10 @@ local msg = string.format(
     pass, total,
     fail > 0 and (" | " .. fail .. " FAIL — see CTLD.log") or ""
 )
-trigger.action.outText(msg, 15)
+trigger.action.outText(msg, 15, true)
 ctld.utils.log("INFO", msg)
 
+_SCN_FO_RUNNING = false
 return "TAG=FO_EXTRACTABLE_GROUPS | steps=" .. total .. " | pass=" .. pass .. " | fail=" .. fail
+end  -- do isolation scope
+return Witchcraft

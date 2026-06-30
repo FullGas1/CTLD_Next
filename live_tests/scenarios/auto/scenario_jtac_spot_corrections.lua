@@ -1,3 +1,4 @@
+---@diagnostic disable
 -- ============================================================
 -- JTAC Spot Corrections toggle — recette automatique
 -- ============================================================
@@ -6,6 +7,20 @@
 -- Famille : auto (aucune intervention humaine)
 -- ============================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[F-SC] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_F_SC_RUNNING then
+    trigger.action.outText("[F-SC] already running.", 10)
+    return Witchcraft
+end
+_SCN_F_SC_RUNNING = true
+
+do  -- isolation scope
 trigger.action.outText("[F-SC] START — JTAC Spot Corrections toggle", 8)
 
 local JTAC_NAME = "mock_jtac_sc"
@@ -92,5 +107,8 @@ mgr._rebuildJTACCommandBranch  = _origRebuild
 local total = passed + failed
 local msg = string.format("[F-SC] %d/%d PASS", passed, total)
 if #failures > 0 then msg = msg .. " | FAIL: " .. table.concat(failures, ", ") end
-trigger.action.outText(msg, 12)
+trigger.action.outText(msg, 12, true)
+_SCN_F_SC_RUNNING = false
 return msg
+end  -- do isolation scope
+return Witchcraft

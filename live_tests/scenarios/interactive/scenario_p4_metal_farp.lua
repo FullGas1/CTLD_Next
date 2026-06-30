@@ -15,6 +15,11 @@
 -- Prérequis : UH-1H BLUE au sol
 -- =============================================================================
 
+-- ── Witchcraft guard ────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[P4-METAL] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
 local TAG      = "[P4-METAL]"
 local STEP_VAR = "_P4_METAL_STEP"
 
@@ -35,6 +40,7 @@ end
 
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"]                  = true
 cfg.settings["debugScreenLog"]         = true
 cfg.settings["debugScreenLogDuration"] = 12
@@ -122,8 +128,11 @@ end
 end)  -- end pcall
 
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 if not _ok then
+    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
     return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
 end
+trigger.action.outText(TAG .. " ✅ step=" .. step .. " SUCCESS", 30, true)
 return TAG .. " step=" .. step .. " SUCCESS"

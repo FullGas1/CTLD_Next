@@ -17,11 +17,27 @@
 -- Family        : auto
 -- =============================================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[B3] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_B3_RUNNING then
+    trigger.action.outText("[B3] already running.", 10)
+    return Witchcraft
+end
+_SCN_B3_RUNNING = true
+
+do  -- isolation scope
 trigger.action.outText("[B3] START — loadCrateFromMenu config guard", 8)
 
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local pass = 0
 local fail = 0
@@ -210,7 +226,10 @@ local msg = string.format(
     pass, total,
     fail > 0 and (" | " .. fail .. " FAIL — see CTLD.log") or ""
 )
-trigger.action.outText(msg, 15)
+trigger.action.outText(msg, 15, true)
 ctld.utils.log("INFO", msg)
 
+_SCN_B3_RUNNING = false
 return "TAG=B3_LOAD_CRATE_FROM_MENU | steps=" .. total .. " | pass=" .. pass .. " | fail=" .. fail
+end  -- do isolation scope
+return Witchcraft

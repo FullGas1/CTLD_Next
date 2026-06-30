@@ -16,11 +16,27 @@
 -- Famille   : auto
 -- =============================================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[I18N-FMT] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_I18N_RUNNING then
+    trigger.action.outText("[I18N-FMT] already running.", 10)
+    return Witchcraft
+end
+_SCN_I18N_RUNNING = true
+
+do  -- isolation scope
 trigger.action.outText("[I18N-FMT] START — i18n format migration validation", 8)
 
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local pass = 0
 local fail = 0
@@ -102,6 +118,7 @@ checkContains("F-167 guard message contains '(1/1)'", capturedMsg, "(1/1)")
 
 -- ── Résultat final ────────────────────────────────────────────────────────────
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 local total = pass + fail
 local msg = string.format(
@@ -109,7 +126,10 @@ local msg = string.format(
     pass, total,
     fail > 0 and (" | " .. fail .. " FAIL — voir CTLD.log") or ""
 )
-trigger.action.outText(msg, 15)
+trigger.action.outText(msg, 15, true)
 ctld.utils.log("INFO", msg)
 
+_SCN_I18N_RUNNING = false
 return "TAG=I18N_FORMAT | steps=" .. total .. " | pass=" .. pass .. " | fail=" .. fail
+end  -- do isolation scope
+return Witchcraft

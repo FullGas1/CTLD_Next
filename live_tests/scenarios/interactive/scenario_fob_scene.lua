@@ -16,6 +16,12 @@
 --   • enable_debug.lua injecté avant ce script
 -- =============================================================================
 
+-- ── Witchcraft guard ─────────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[FOB-SCN] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
 local TAG      = "[FOB-SCN]"
 local STEP_VAR = "_FOB_SCN_STEP"
 
@@ -57,6 +63,7 @@ end
 
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"]             = true
 cfg.settings["debugScreenLog"]    = true
 cfg.settings["debugScreenLogDuration"] = 12
@@ -233,9 +240,12 @@ end)  -- end pcall
 
 -- ── cleanup debug ─────────────────────────────────────────────────────────────
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 -- ── return Witchcraft ─────────────────────────────────────────────────────────
 if not _ok then
+    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
     return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
 end
+trigger.action.outText(TAG .. " ✅ step=" .. step .. " SUCCESS", 30, true)
 return TAG .. " step=" .. step .. " SUCCESS"

@@ -17,9 +17,17 @@
 -- Family : interactive
 -- =============================================================================
 
+-- ── Witchcraft guard ─────────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[CMFV-VIS] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local TAG   = "[CMFV-VIS]"
 local STEP_N = "_CMFV_VIS_STEP"
@@ -91,4 +99,6 @@ else
 end
 
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+trigger.action.outText(TAG .. " ✅ DONE", 20, true)
 return TAG .. " step=" .. step .. " injected"

@@ -20,9 +20,17 @@
 --   - At least one loadableGroups entry defined in config
 -- =============================================================================
 
+-- ── Witchcraft guard ─────────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[AI-TRANSPORT] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
 local cfg = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local TAG    = "[AI-TRANSPORT]"
 local START  = os.date("%Y-%m-%d %H:%M:%S")
@@ -345,12 +353,15 @@ end
 end)  -- end pcall
 
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 local _ms = math.floor((os.clock() - _step_start) * 1000)
 if not _ok then
+    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
     return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
 end
 if _result == "ALL SUCCESS" then
+    trigger.action.outText(TAG .. " ✅ ALL SUCCESS (" .. _ms .. "ms)", 30, true)
     return TAG .. " " .. _result .. " (" .. _ms .. "ms)"
 end
 return TAG .. " " .. _result:gsub("SUCCESS", "SUCCESS (" .. _ms .. "ms)")

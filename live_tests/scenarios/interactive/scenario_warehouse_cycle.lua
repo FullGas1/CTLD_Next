@@ -27,6 +27,11 @@
 --   • enableFARPRepack must be true (set automatically by step 1)
 -- =============================================================================
 
+-- ── Witchcraft guard ────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[WRHSE] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
 local TAG      = "[WRHSE]"
 local STEP_VAR = "_WRHSE_STEP"
 local POS_VAR  = "_WRHSE_PACK_POS"  -- stored pack position for relocation check
@@ -85,7 +90,8 @@ end
 -- ── debug activation ──────────────────────────────────────────────────────────
 
 local cfg            = CTLDConfig.get()
-local _saved_debug   = cfg.settings["debug"]
+local _saved_debug         = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 -- enableFARPRepack is intentionally NOT saved/restored — it must persist between injections.
 
 cfg.settings["debug"]                  = true
@@ -383,9 +389,12 @@ end)  -- end pcall
 
 -- ── cleanup (always executed — debug + config restored even on fail) ──────────
 cfg.settings["debug"]            = _saved_debug
+cfg.settings["debugScreenLog"]   = _savedDebugScreenLog
 
 -- ── Witchcraft return value ───────────────────────────────────────────────────
 if not _ok then
+    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
     return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
 end
+trigger.action.outText(TAG .. " ✅ step=" .. step .. " SUCCESS", 30, true)
 return TAG .. " step=" .. step .. " SUCCESS"

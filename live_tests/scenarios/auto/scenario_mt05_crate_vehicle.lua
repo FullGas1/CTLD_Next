@@ -1,3 +1,4 @@
+---@diagnostic disable
 -- ============================================================
 -- MT-05 AUTO — Crate + véhicule entier : isolation croisée
 -- ============================================================
@@ -9,6 +10,20 @@
 -- Famille    : auto (aucune intervention humaine)
 -- ============================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[MT-05] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_MT05_RUNNING then
+    trigger.action.outText("[MT-05] already running.", 10)
+    return Witchcraft
+end
+_SCN_MT05_RUNNING = true
+
+do  -- isolation scope
 trigger.action.outText("[MT-05] START — crate + véhicule entier isolation", 8)
 
 local TRANSPORT_NAME = "mock_transport_MT05"
@@ -115,7 +130,7 @@ vs._vehicles[VEHICLE_ID] = nil
 -- ── Résultat ─────────────────────────────────────────────────
 local total = passed + failed
 local msg = string.format("[MT-05] %d/%d PASS", passed, total)
-trigger.action.outText(msg, 12)
+trigger.action.outText(msg, 12, true)
 ctld.utils.log("INFO", msg)
 if failed > 0 then
     ctld.utils.log("ERROR", "[MT-05] FAILED tests: " .. failed)
@@ -124,4 +139,7 @@ end
 if #failures > 0 then
     msg = msg .. " | FAIL: " .. table.concat(failures, ", ")
 end
+_SCN_MT05_RUNNING = false
 return msg
+end  -- do isolation scope
+return Witchcraft

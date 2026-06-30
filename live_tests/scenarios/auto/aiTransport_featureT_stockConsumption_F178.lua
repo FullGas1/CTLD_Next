@@ -11,6 +11,27 @@
 --   et sans effet quand isAll=true.
 -- =============================================================================
 
+-- ── 1. Witchcraft guard ──────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[F-178] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── 2. Double-injection guard ────────────────────────────────────────────────
+if _SCN_F178_RUNNING then
+    trigger.action.outText("[F-178] already running.", 10)
+    return Witchcraft
+end
+_SCN_F178_RUNNING = true
+
+do
+
+local cfg = CTLDConfig.get()
+local _savedDebug          = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
+cfg.settings["debug"]          = true
+cfg.settings["debugScreenLog"] = true
+
 local TAG   = "[F-178]"
 local START = os.date("%Y-%m-%d %H:%M:%S")
 
@@ -140,6 +161,17 @@ local _ok, _err = pcall(function()
 end)
 
 if not _ok then
+    cfg.settings["debug"]          = _savedDebug
+    cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+    trigger.action.outText(TAG .. " ❌ FAIL: " .. tostring(_err), 60, true)
+    _SCN_F178_RUNNING = false
     return TAG .. " FAIL: " .. tostring(_err)
 end
-return TAG .. " ALL PASS"
+
+cfg.settings["debug"]          = _savedDebug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+trigger.action.outText(TAG .. " ✅ ALL PASS", 30, true)
+_SCN_F178_RUNNING = false
+
+end  -- do isolation scope
+return Witchcraft

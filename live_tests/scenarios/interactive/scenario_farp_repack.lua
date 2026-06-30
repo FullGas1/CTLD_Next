@@ -21,6 +21,12 @@
 -- Prerequisites: UH-1H BLUE slot occupied, helicopter on the ground
 -- =============================================================================
 
+-- ── Witchcraft guard ─────────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[FRP] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
 local TAG      = "[FRP]"
 local STEP_VAR = "_FRP_STEP"
 
@@ -54,6 +60,7 @@ end
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
 local _saved_repack = cfg.settings["enableFARPRepack"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 
 cfg.settings["debug"]                  = true
 cfg.settings["debugScreenLog"]         = true
@@ -230,10 +237,13 @@ end)  -- end pcall
 
 -- ── cleanup (always executed — debug and config restored even on fail) ────────
 cfg.settings["debug"]            = _saved_debug
+cfg.settings["debugScreenLog"]   = _savedDebugScreenLog
 cfg.settings["enableFARPRepack"] = _saved_repack
 
 -- ── Witchcraft return value ───────────────────────────────────────────────────
 if not _ok then
+    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
     return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
 end
+trigger.action.outText(TAG .. " ✅ step=" .. step .. " SUCCESS", 30, true)
 return TAG .. " step=" .. step .. " SUCCESS"

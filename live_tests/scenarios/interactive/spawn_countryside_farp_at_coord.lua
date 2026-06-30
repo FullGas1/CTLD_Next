@@ -4,13 +4,20 @@
 -- of the static object named "coord_farp-1".
 -- ============================================================
 
+-- ── Witchcraft guard ────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[SPAWN-CS-FARP] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
 local TAG   = "[CS-FARP-SPAWN]"
 local START = os.date("%Y-%m-%d %H:%M:%S")
 trigger.action.outText(TAG .. " START " .. START, 10)
 
 local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local ok, err = pcall(function()
 
@@ -46,4 +53,6 @@ if not ok then
 end
 
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+trigger.action.outText(TAG .. " ✅ DONE", 20, true)
 return "done"

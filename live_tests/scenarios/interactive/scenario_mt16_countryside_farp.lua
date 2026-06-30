@@ -6,6 +6,11 @@
 -- Prérequis : joueur BLUE au sol dans un UH-1H, 1 crate "Countryside FARP" à portée
 -- Protocole  : injecter ce script → vérifier messages écran + formation scène ~30 s
 
+-- ── Witchcraft guard ────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[SCENARIO_CS_FARP] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
 local TAG  = "[SCENARIO_CS_FARP]"
 local step = 0
 
@@ -66,4 +71,5 @@ info("CTLDSceneManager has " .. count .. " registered models — check no duplic
 info("Setup done (" .. step .. "/2 checks). Land near crate and use F10 > Unpack Crates > Deploy Countryside FARP.")
 info("Scene should complete in ~30 s with: Invisible FARP + tyres + trucks + tent + ammo + guards + light.")
 
+trigger.action.outText(TAG .. " ✅ DONE", 20, true)
 return TAG .. " SETUP OK step=" .. step

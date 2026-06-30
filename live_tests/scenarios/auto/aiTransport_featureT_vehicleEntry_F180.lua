@@ -14,6 +14,27 @@
 --   - positionne isScene=false si le typeName est un type DCS non-scène
 -- =============================================================================
 
+-- ── 1. Witchcraft guard ──────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[F-180] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── 2. Double-injection guard ────────────────────────────────────────────────
+if _SCN_F180_RUNNING then
+    trigger.action.outText("[F-180] already running.", 10)
+    return Witchcraft
+end
+_SCN_F180_RUNNING = true
+
+do
+
+local cfg = CTLDConfig.get()
+local _savedDebug          = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
+cfg.settings["debug"]          = true
+cfg.settings["debugScreenLog"] = true
+
 local TAG   = "[F-180]"
 local START = os.date("%Y-%m-%d %H:%M:%S")
 
@@ -167,7 +188,16 @@ pcall(function()
     CTLDSceneManager.getInstance()._models["__TEST_SCENE_F154__"] = nil
 end)
 
+cfg.settings["debug"]          = _savedDebug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+
 if not _ok then
+    trigger.action.outText(TAG .. " ❌ FAIL: " .. tostring(_err), 60, true)
+    _SCN_F180_RUNNING = false
     return TAG .. " FAIL: " .. tostring(_err)
 end
-return TAG .. " ALL PASS"
+trigger.action.outText(TAG .. " ✅ ALL PASS", 30, true)
+_SCN_F180_RUNNING = false
+
+end  -- do isolation scope
+return Witchcraft

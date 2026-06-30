@@ -19,6 +19,20 @@
 --   F-181.10 aiPickVehicleEntry sur stock { ["Hummer"]=1 }         → isScene=false,   isAASystem=false/nil
 -- =============================================================================
 
+-- ── Witchcraft guard ───────────────────────────────────────────────────────
+if not ctld or not ctld.utils then
+    trigger.action.outText("[F-181] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    return Witchcraft
+end
+
+-- ── Double-injection guard ─────────────────────────────────────────────
+if _SCN_F181_RUNNING then
+    trigger.action.outText("[F-181] already running.", 10)
+    return Witchcraft
+end
+_SCN_F181_RUNNING = true
+
+do  -- isolation scope
 local TAG   = "[F-181]"
 local START = os.date("%Y-%m-%d %H:%M:%S")
 
@@ -36,7 +50,9 @@ end
 
 local cfg = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
+cfg.settings["debugScreenLog"] = true
 
 local _step_start = os.clock()
 local _result = "INCOMPLETE"
@@ -119,9 +135,16 @@ _result = "ALL SUCCESS"
 end)
 
 cfg.settings["debug"] = _saved_debug
+cfg.settings["debugScreenLog"] = _savedDebugScreenLog
 
 local _ms = math.floor((os.clock() - _step_start) * 1000)
 if not _ok then
+    trigger.action.outText(TAG .. " ❌ FAIL: " .. tostring(_err), 60, true)
+    _SCN_F181_RUNNING = false
     return TAG .. " FAIL: " .. tostring(_err)
 end
+trigger.action.outText(TAG .. " ✅ ALL PASS (" .. _ms .. "ms)", 30, true)
+_SCN_F181_RUNNING = false
 return TAG .. " " .. _result .. " (" .. _ms .. "ms)"
+end  -- do isolation scope
+return Witchcraft
