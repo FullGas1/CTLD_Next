@@ -909,7 +909,7 @@ Enable the dedicated CTLD log file to isolate CTLD messages from the DCS standar
 -- CTLD_userConfig.lua
 ctld.yamlConfigDatas = [[
   ctld.debug: true
-  ctld.ctldLogPath: "C:\\Users\\<you>\\path\\to\\CTLD_Next\\live_tests\\"
+  ctld.ctldLogPath: "C:\\Users\\<you>\\path\\to\\CTLD_Next\\tests\\dcs\\"
 ]]
 ```
 

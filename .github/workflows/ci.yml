@@ -107,9 +107,9 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────────────────────
-  # Job 3 — busted tests (tests/**/*_spec.lua)
-  # Covers: tests/specs/ (existing), tests/unit/ (L1), tests/functional/ (L2).
-  # Runs entirely without DCS — DCS API is stubbed in tests/helpers/.
+  # Job 3 — busted tests (tests/ci/**/*_spec.lua)
+  # Covers: tests/ci/unit/ (L1), tests/ci/functional/ (L2).
+  # Runs entirely without DCS — DCS API is stubbed in tests/ci/helpers/.
   # ─────────────────────────────────────────────────────────────
   busted:
     name: busted Tests
@@ -124,7 +124,7 @@ jobs:
           sudo luarocks install busted
 
       - name: Run busted
-        run: busted tests/
+        run: busted tests/ci/
 
   # ─────────────────────────────────────────────────────────────
   # Job 4 — MkDocs deploy to GitHub Pages (master branch only)

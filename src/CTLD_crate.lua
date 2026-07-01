@@ -822,7 +822,7 @@ end
 -- Visible only when on the ground — absent in flight.
 -- Lists repackable FARP scenes (within 300 m) and packable vehicles nearby.
 -- @param playerObj CTLDPlayer
-function CTLDCrateManager:refreshPackEquiptSection(playerObj)
+function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir)
     local farpEnabled    = ctld.gs("enableFARPRepack") == true
     local vehicleEnabled = ctld.gs("enablePackingVehicles") == true
     if not (farpEnabled or vehicleEnabled) then return end
@@ -847,10 +847,25 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj)
     end
 
     -- In-flight: submenu absent.
-    if ctld.utils.inAir(transport) then
+    -- overrideInAir: true = force flight, false = force ground, nil = use _isFlying flag / inAir().
+    local inAir
+    if overrideInAir ~= nil then
+        inAir = overrideInAir
+    elseif playerObj._isFlying ~= nil then
+        inAir = playerObj._isFlying
+    else
+        inAir = ctld.utils.inAir(transport)
+    end
+    if inAir then
+        -- clearBranch empties children but keeps the node in the tree (enabled=true).
+        -- setBranchEnabled hides it from DCS rendering on next refresh().
+        menu:setBranchEnabled({ root, cratesSub, packSub }, false)
         menu:refresh()
         return
     end
+
+    -- On ground: ensure node is visible before (re-)populating it.
+    menu:setBranchEnabled({ root, cratesSub, packSub }, true)
 
     -- Collect FARP scenes to pack.
     local scenes = {}
@@ -865,8 +880,9 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj)
         packableVehicles = CTLDVehicleSpawner.getInstance():findPackableVehicles(transport)
     end
 
-    -- If nothing to pack, do not add the submenu.
+    -- If nothing to pack, hide the submenu and return.
     if #scenes == 0 and #packableVehicles == 0 then
+        menu:setBranchEnabled({ root, cratesSub, packSub }, false)
         menu:refresh()
         return
     end
@@ -2580,7 +2596,7 @@ end
 --              Release Slingload, Cut Slingload (caps.canSlingload + slingloaded crate active).
 -- Called from buildMenuSection, onTakeoff, and onLand.
 -- @param playerObj CTLDPlayer
-function CTLDCrateManager:refreshCrateFlightSection(playerObj)
+function CTLDCrateManager:refreshCrateFlightSection(playerObj, overrideInAir)
     local caps = (ctld.gs("capabilitiesByType") or {})[playerObj.typeName]
     if not (playerObj.isTransport and caps and caps.cratesEnabled) then return end
 
@@ -2592,7 +2608,16 @@ function CTLDCrateManager:refreshCrateFlightSection(playerObj)
     local cratesSub = ctld.tr("Crate Commands")
 
     local transport = Unit.getByName(playerObj.unitName)
-    local inAir     = transport and transport:isExist() and ctld.utils.inAir(transport) or false
+    -- overrideInAir: true = force flight, false = force ground, nil = use _isFlying flag / inAir().
+    -- _isFlying is set by onTakeoff / onLand to bridge the gap before inAir() threshold settles.
+    local inAir
+    if overrideInAir ~= nil then
+        inAir = overrideInAir
+    elseif playerObj._isFlying ~= nil then
+        inAir = playerObj._isFlying
+    else
+        inAir = transport and transport:isExist() and ctld.utils.inAir(transport) or false
+    end
 
     -- Ground-only: visible only when landed
     if ctld.gs("loadCrateFromMenu") then
@@ -2601,7 +2626,7 @@ function CTLDCrateManager:refreshCrateFlightSection(playerObj)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("Drop Crate(s)") },      not inAir)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("Unpack Crate") },       not inAir)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("List Nearby Crates") }, not inAir)
-    self:refreshPackEquiptSection(playerObj)
+    self:refreshPackEquiptSection(playerObj, inAir)
 
     -- Parachute Crates: enabled only in air + CTLD crates loaded
     if caps.canParachuteDrop then

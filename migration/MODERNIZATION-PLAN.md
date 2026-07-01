@@ -781,6 +781,23 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
         • Parachute Crates : exclut crates inTransitOnSlingload du comptage onboard
         • outTextForGroup slingload confirmation : clearview=true → efface décompte hover (F-175 PASS live)
 
+✅  FG  Bugfixes menu crates live DCS — sol/vol/sol validation [2026-06-30]
+        • findPackableVehicles : veh.unitName → veh.spawnData.unitName (Pack Vehicle ne listait aucun véhicule)
+        • refreshCrateFlightSection(playerObj, overrideInAir) : param tristate (nil/true/false)
+            + flag _isFlying sur CTLDPlayer pour refresh immédiat sans attendre onTakeoff/onLand
+        • refreshPackEquiptSection : setBranchEnabled(false) après clearBranch → menu propre en vol
+        • onTakeoff : _isFlying=true + appel immédiat refreshCrateFlightSection(playerObj, true)
+        • onLand : _isFlying=false immédiat + timer 1 s → refreshCrateFlightSection(playerObj, false)
+        • addSubMenu : idempotent — met à jour order + enabled si sous-menu déjà existant
+        Recette : tests/dcs/pilotActive/scenario_crate_menu_sol_vol_visual.lua 5/5 PASS live DCS [2026-06-30]
+
+✅  FG  Feature — Troop Commands menu sol/vol/sol split [2026-06-30]
+        CTLD_troop.lua + CTLD_menu.lua : refreshTroopFlightSection analogue à refreshCrateFlightSection
+        • Sol : Load Troops, Unload Troops, List Nearby Troops, Disembark All/By Index
+        • Vol : Parachute Troops
+        Recette : F-183 (sol) / F-184 (vol) / F-185 (sol restauré)
+        tests/dcs/pilotActive/scenario_troop_menu_sol_vol_visual.lua 5/5 PASS live DCS [2026-06-30]
+
 ✅  FG  Feature Q — Vehicle whole-unit air transport [2026-05-19]
         GAP-Q1: findLoadableVehicles coalition filter (BLUE transport cannot see RED vehicles).
         GAP-Q2: findLoadableVehicles type filter via loadableVehiclesRED/BLUE + _isTypeLoadable helper.
@@ -1404,34 +1421,44 @@ Minor cleanups identified — low priority, no functional impact.
 
 > Objectif : couvrir ≥60% des features principales en CI automatisé à chaque release.
 
-### Taxonomie des recettes (4 niveaux)
+### Taxonomie des recettes (6 niveaux)
 
 | Niveau | Type | Dossier | Exécution | Outils |
 | --- | --- | --- | --- | --- |
-| **L1** | Busted unit | `tests/unit/` | CI automatique (GitHub Actions) | busted, dcs_stubs.lua |
-| **L2** | Busted functional | `tests/functional/` | CI automatique (GitHub Actions) | busted, dcs_stubs.lua |
-| **L3** | Witchcraft auto | `live_tests/scenarios/auto/` | Manuel + mission DCS headless (pas de joueur) | Witchcraft inject + CTLD.log |
-| **L4** | Witchcraft interactif | `live_tests/scenarios/interactive/` | Manuel + mission DCS + joueur humain | Witchcraft inject + F10 menu |
+| **L1** | Busted unit | `tests/ci/unit/` | CI automatique (GitHub Actions) | busted, dcs_stubs.lua |
+| **L2** | Busted functional | `tests/ci/functional/` | CI automatique (GitHub Actions) | busted, dcs_stubs.lua |
+| **L3** | Witchcraft noPlayer | `tests/dcs/noPlayer/` | Développeur local — DCS + Witchcraft, pas de slot joueur | Witchcraft inject + CTLD.log |
+| **L4** | Witchcraft pilotPassive | `tests/dcs/pilotPassive/` | Développeur local — DCS + joueur en cockpit, script pilote | Witchcraft inject + CTLD.log |
+| **L5** | Witchcraft pilotActive | `tests/dcs/pilotActive/` | Développeur local — DCS + joueur doit agir au menu F10 | Witchcraft inject + F10 menu |
+| **L6** | Manuel | `tests/manual_test_sequences.md` | Développeur local — joueur, checklist étape par étape | Observation pure |
 
-> Les fichiers `live_tests/unit/` (U-*) et `live_tests/functional/` (F-*) au format Witchcraft restent comme **référence de couverture** — ils documentent ce qui doit être testé. Les `tests/unit/` et `tests/functional/` en sont l'implémentation CI.
+> Les scripts L3/L4/L5 (U-*, F-*, scenario_*) sont injectés via Witchcraft dans une mission DCS active.
+> Les specs L1/L2 (`*_spec.lua`) sont exécutées par busted sans DCS — l'API DCS est remplacée par `tests/ci/helpers/dcs_stubs.lua`.
 
-### Structure cible `tests/`
+### Structure `tests/`
 
 ```text
 tests/
-├── helpers/
-│   ├── dcs_stubs.lua       ← stubs DCS partagés (existant)
-│   ├── loader.lua          ← charge src/ dans l'ordre listToMerge (existant)
-│   └── init.lua            ← point d'entrée busted (existant)
-├── specs/                  ← existant — garder pour compatibilité
-│   └── crate_manager_test.lua
-├── unit/                   ← NOUVEAU — migration U-* en busted (*_spec.lua)
-│   └── *.spec.lua
-└── functional/             ← NOUVEAU — F-* sélectifs en busted (*_spec.lua)
-    └── *.spec.lua
+├── ci/                         ← scripts busted — exécutés par GitHub Actions CI
+│   ├── helpers/
+│   │   ├── dcs_stubs.lua       ← stubs DCS partagés
+│   │   ├── loader.lua          ← charge src/ dans l'ordre listToMerge
+│   │   └── init.lua            ← point d'entrée busted
+│   ├── unit/                   ← L1 — ~105 tests (~21 spec files)
+│   │   └── *_spec.lua
+│   └── functional/             ← L2 — ~45 tests (8 spec files)
+│       └── *_spec.lua
+├── dcs/                        ← scripts Witchcraft — exécutés en DCS local par le développeur
+│   ├── noPlayer/               ← L3 — U-xxx, F-xxx, scenario_* (pas de slot joueur requis)
+│   ├── pilotPassive/           ← L4 — scenario_* (joueur en cockpit, script pilote tout)
+│   ├── pilotActive/            ← L5 — scenario_* (joueur doit agir au menu F10)
+│   ├── dev/                    ← diag/, legacy/ (scripts de diagnostic et référence)
+│   └── util/                   ← utilitaires (reset_steps, wait_ctld_ready, init_log…)
+├── recette.md                  ← historique de recette (qui/quand/résultat)
+└── manual_test_sequences.md    ← L6 — checklists MT-xx manuelles
 ```
 
-### Sélection L1/L2 (candidats CI)
+### Sélection L1/L2 — candidats CI
 
 **L1 — Unit (tous migrables)** : U-001→U-096, U-106→U-108
 Config, EventDispatcher, Zones, Crates, Troops, JTAC, Menu, Utils, i18n, ModValidator — ~105 tests
@@ -1450,30 +1477,36 @@ F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
 #### L1/L2 — CI busted (automatique)
 
 1. Push sur `master` ou `feature_*` → GitHub Actions déclenche job busted
-2. Job : `busted tests/` (pattern `_spec`)
+2. Job : `busted tests/ci/` (pattern `_spec`)
 3. Résultat : PASS/FAIL dans PR checks
 4. Aucune action manuelle requise
 
-#### L3 — Witchcraft auto (mission DCS, pas de joueur)
+#### L3 — noPlayer (DCS + Witchcraft, pas de slot joueur)
 
-1. Lancer DCS en mode serveur/éditeur avec la mission de test `missions/Test_CTLDNEXT_01.miz`
-2. Activer Witchcraft (mission start)
-3. Injecter `live_tests/shutdown_ctld.lua` si CTLD déjà actif
-4. Injecter `CTLD_Next.lua` (après rebuild si src/ modifié)
-5. Attendre 3–5 s (init CTLD)
-6. Injecter le scénario `live_tests/scenarios/auto/scenario_xxx.lua`
-7. Lire `CTLD.log` : chercher `[PASS]` / `[FAIL]` / `[SUCCESS]`
-8. En cas d'échec : analyser le log, corriger, rebuildere et recommencer depuis l'étape 3
+1. Lancer DCS avec la mission de test, Witchcraft activé
+2. Injecter `CTLD_Next.lua` (après rebuild si src/ modifié) + attendre 3–5 s
+3. Injecter le script `tests/dcs/noPlayer/F-xxx.lua` ou `scenario_xxx.lua`
+4. Lire `tests/dcs/CTLD.log` : `fail=0` + aucun `[FAIL]`
 
-#### L4 — Witchcraft interactif (mission DCS + joueur)
+#### L4 — pilotPassive (DCS + joueur en cockpit, script pilote)
 
-1. Lancer DCS, charger mission, prendre un slot transport (ex. UH-1H)
-2. Activer Witchcraft
-3. Injecter `CTLD_Next.lua` + attendre init
-4. Injecter le scénario interactif
-5. Suivre les instructions affichées à l'écran (actions F10 menu, positionnement)
-6. Vérifier les messages outText + CTLD.log
-7. Valider visuellement (spawns, menus, effets)
+1. Prendre un slot transport BLUE (UH-1H ou équivalent)
+2. Injecter `CTLD_Next.lua` + attendre init
+3. Injecter le scénario `tests/dcs/pilotPassive/scenario_xxx.lua`
+4. Observer — aucune action F10 requise
+5. Vérifier `[PASS]` sur tous les steps + contrôles visuels
+
+#### L5 — pilotActive (DCS + joueur doit agir au menu F10)
+
+1. Prendre un slot transport BLUE
+2. Injecter `CTLD_Next.lua` + attendre init
+3. Injecter le scénario `tests/dcs/pilotActive/scenario_xxx.lua`
+4. Suivre les instructions à l'écran — effectuer les actions F10 demandées
+5. Vérifier `[PASS]` + validation visuelle menu
+
+#### L6 — Manuel (checklist pure)
+
+Suivre `tests/manual_test_sequences.md` — aucun script, observation directe.
 
 ### TODOs
 
@@ -1492,6 +1525,10 @@ F-120→F-123 (vehicle load/unload), F-140→F-146 (multi-group) — ~45 tests
 - ✅ **TODO-CI-6** : Documenter la procédure L3/L4 dans `docs/dev-guide.md` §Testing
   - `docs/dev-guide.md` §8 réécrit : busted, Witchcraft, CTLD.log, debug config, format sortie, cleanup [2026-06-29]
   - `docs/recette-procedure.md` créé : procédure complète L1→L4 (qui/quand/quoi, ordre, checklist) [2026-06-29]
+- ✅ **TODO-CI-7** : Restructuration `live_tests/` → `tests/ci/` + `tests/dcs/` (noPlayer/pilotPassive/pilotActive) [2026-07-01]
+  - 6 niveaux L1→L6 avec noms de dossiers reflétant le contexte d'exécution
+  - Toutes les références `live_tests/` mises à jour : docs/, CLAUDE.md, .claude/witchcraft-workflow.md, src/
+  - `docs/recette-procedure.md` réécrit avec taxonomie L1→L6 + tableaux de mapping par niveau
 - ✅ **TODO-DOC-1** : Audit documentation MM + dev — vérifier que chaque module/feature de `src/` est couvert dans `docs/missionmaker_guide.md` et `docs/dev-guide.md` ; vérifier que `README.md` couvre toutes les fonctionnalités. Livrables : liste des lacunes + mises à jour des fichiers concernés.
   - `docs/dev-guide.md` §12–§19 ajoutés : Zone management, Vehicle system, Beacon, Recon, F10 Menu, Player tracking, AA System, Internal libraries [2026-06-29]
   - `README.md` : subsection Testing ajoutée avec commandes busted et pointeur vers `tests/` [2026-06-29]

@@ -1215,7 +1215,7 @@ function CTLDVehicleSpawner:findPackableVehicles(transport)
 
     for _, veh in pairs(self._vehicles) do
         if veh:getState() == CTLDVehicle.STATE.WAITING then
-            local uName = veh.unitName
+            local uName = veh.spawnData and veh.spawnData.unitName
             if uName then
                 local liveRef = Unit.getByName(uName)
                 if liveRef and liveRef:isExist() then

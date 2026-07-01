@@ -49,15 +49,56 @@ cfg.settings["debug"] = _saved_debug
 
 ---
 
-## Prérequis — `ctldLogPath`
+## Prérequis — `ctldLogPath` et `CTLD.log`
 
-Pour que `ctld.utils.log` écrive dans `CTLD.log`, le chemin doit être défini **avant le démarrage de CTLD** :
+### Emplacement physique
 
-```lua
-cfg.settings["ctldLogPath"] = ctld.path .. "live_tests\\"  -- ctld.path défini dans le trigger MISSION START du .miz
+```text
+tests/dcs/CTLD.log           ← fichier de log (gitignored dans tests/dcs/.gitignore)
 ```
 
-> Ce chemin est **local à la machine**. Le définir via un trigger **MISSION START → DO SCRIPT FILE** dans le `.miz` de test. Ne jamais commiter ce chemin dans le repo.
+### Logique d'ouverture
+
+`ctld.utils.log()` écrit dans `ctld.__logFile` (handle ouvert par `ctld.utils.initLog()`).
+`initLog()` est appelé **une seule fois à l'init CTLD** : il lit `ctldLogPath` et ouvre le fichier.
+
+- Si `ctldLogPath = ""` au moment où CTLD démarre → aucun fichier créé, les logs vont uniquement dans `env.info()`.
+- Le chemin est lu dynamiquement à chaque appel `log()` mais **le handle est ouvert une seule fois par `initLog()`**.
+- Changer `ctldLogPath` après l'init ne suffit pas — il faut rappeler `initLog()`.
+
+### Méthode préférée — trigger MISSION START dans le `.miz`
+
+```lua
+-- Trigger MISSION START → DO SCRIPT (local à la machine, jamais commité)
+cfg.settings["ctldLogPath"] = "C:\\Users\\Moi\\Documents\\GitHub\\CTLD_Next\\tests\\dcs\\"
+```
+
+### Méthode alternative — activation live (si ctldLogPath vide en session)
+
+**Vérifier d'abord si le chemin est configuré** :
+
+```bash
+node bridge.js "c:/tmp/get_log_path.lua"
+# → "" si vide, chemin si OK
+```
+
+`get_log_path.lua` : `return tostring(CTLDConfig.get().settings["ctldLogPath"])`
+
+**Si vide, activer live** (injecter `c:/tmp/init_log.lua`) :
+
+```lua
+-- c:/tmp/init_log.lua
+local logPath = "C:\\Users\\Moi\\Documents\\GitHub\\CTLD_Next\\tests\\dcs\\"
+CTLDConfig.get().settings["ctldLogPath"] = logPath
+CTLDConfig.get().settings["debug"] = true
+ctld.utils.initLog()
+return logPath .. "CTLD.log"
+```
+
+Après injection, `tests/dcs/CTLD.log` est créé et les logs suivants y sont écrits.
+
+> **Règle** : en début de session recette interactive, toujours vérifier `ctldLogPath` et activer le log live si absent, avant d'injecter CTLD_Next.lua ou les scenarios.
+> Ce chemin est **local à la machine**. Le définir dans le `.miz` ou via `init_log.lua`. Ne jamais commiter.
 
 ---
 
@@ -103,8 +144,8 @@ Get-Content "$ctldLogPath\CTLD.log"
 
 Chemins :
 ```
-CTLD.log  →  {ctldLogPath}CTLD.log       (ex: live_tests/CTLD.log)
-diag.log  →  live_tests/diag.log
+CTLD.log  →  {ctldLogPath}CTLD.log       (ex: tests/dcs/CTLD.log)
+diag.log  →  tests/dcs/diag.log
 DCS.log   →  %USERPROFILE%\Saved Games\DCS\Logs\DCS.log
 ```
 
@@ -113,7 +154,7 @@ DCS.log   →  %USERPROFILE%\Saved Games\DCS\Logs\DCS.log
 ## Workflow recette complet — 7 étapes
 
 ```
-1. CRÉER     copier _template_scenario.lua → live_tests/scenarios/scenario_<nom>.lua
+1. CRÉER     copier _template_scenario.lua → tests/dcs/<sous-dossier>/scenario_<nom>.lua
              remplacer SCENARIO_TAG partout
 
 2. CONFIG    ctldLogPath défini dans le .miz (trigger MISSION START → DO SCRIPT FILE)
@@ -136,7 +177,25 @@ DCS.log   →  %USERPROFILE%\Saved Games\DCS\Logs\DCS.log
              Get-Content "recette\CTLD.log" | Select-String "[mon_tag]"
 ```
 
-**Script d'attente** : `live_tests/wait_ctld_ready.lua` — injecter si CTLDTroopManager n'est pas encore disponible.
+**Script d'attente** : `tests/dcs/util/wait_ctld_ready.lua` — injecter si CTLDTroopManager n'est pas encore disponible.
+
+---
+
+## Lecture du log après scenario interactif (règle permanente)
+
+Les scenarios interactifs utilisent **`debug=true` + `debugScreenLog=false`** :
+
+- Écran DCS propre pour le testeur (seules les `instruct()` s'affichent)
+- Toutes les traces CTLD écrites dans `tests/dcs/CTLD.log`
+
+**L'IA doit lire `tests/dcs/CTLD.log` à la fin de chaque run** pour analyser `[PASS]`, `[FAIL]`, `[TIMEOUT]` et le résumé final — sans attendre que le testeur rapporte le résultat.
+
+```bash
+# Lire le log après run (PowerShell ou bash)
+tail -50 "c:/Users/Moi/Documents/GitHub/CTLD_Next/tests/dcs/CTLD.log"
+# Filtrer sur le tag du scenario
+grep "\[CMFV-VIS\]" "c:/Users/Moi/Documents/GitHub/CTLD_Next/tests/dcs/CTLD.log"
+```
 
 ---
 
@@ -156,7 +215,7 @@ Modif  →  Rebuild (si src/)  →  Injection  →  Lecture CTLD.log  →  Itér
 
 ## Template scenario — structure obligatoire
 
-Tout nouveau scenario est créé depuis `live_tests/scenarios/_template_scenario.lua`.
+Tout nouveau scenario est créé depuis `tests/dcs/_template_scenario.lua`.
 
 **Points clés du template :**
 
@@ -207,7 +266,7 @@ _G["_MON_TAG_STEP"] = nil  -- reset
 
 **Reset de tous les compteurs** (scenario planté) :
 ```bash
-node bridge.js "live_tests/_reset_steps.lua"
+node bridge.js "tests/dcs/util/_reset_steps.lua"
 # → "[RESET_STEPS] Cleared N step counter(s): _MON_TAG_STEP, ..."
 ```
 

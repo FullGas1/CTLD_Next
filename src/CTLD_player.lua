@@ -178,6 +178,84 @@ function CTLDPlayerManager:init()
     end
     CTLDPlayerManager._deferredSections = {}
 
+    -- Flight-state poller (0.5 s cadence).
+    -- S_EVENT_TAKEOFF / S_EVENT_LAND fire with a 3-5 s delay in DCS for helicopters.
+    -- This poller detects the inAir() transition immediately and triggers the same
+    -- refresh chain, so menus switch within 0.5 s of the actual state change.
+    -- onTakeoff / onLand still run when the events fire, but by then _isFlying already
+    -- matches the real state and the refresh is a fast no-op.
+    -- unitName → { confirmed=bool, pending=bool|nil, ticks=number }
+    -- confirmed: last state that triggered a menu refresh (nil = not yet seeded)
+    -- pending:   candidate new state (must hold for DEBOUNCE_TICKS consecutive polls)
+    -- ticks:     consecutive ticks the pending state has been seen
+    self._inAirDebounce = {}
+    local POLL_INTERVAL   = 0.5   -- seconds between checks
+    local DEBOUNCE_TICKS  = 2     -- require 2 consecutive same-state ticks (~1 s) before acting
+    local self_ref = self
+    timer.scheduleFunction(function(_, t)
+        local inst = self_ref
+        if not inst then return nil end
+        for unitName, playerObj in pairs(inst._players) do
+            local unit = Unit.getByName(unitName)
+            if unit and unit:isExist() then
+                local nowInAir = ctld.utils.inAir(unit)
+                local db = inst._inAirDebounce[unitName]
+                if not db then
+                    -- First encounter: seed confirmed state, no refresh needed (buildMenu ran already).
+                    inst._inAirDebounce[unitName] = { confirmed = nowInAir, pending = nil, ticks = 0 }
+                else
+                    if nowInAir == db.confirmed then
+                        -- State matches confirmed: reset pending
+                        db.pending = nil
+                        db.ticks   = 0
+                    else
+                        -- State differs from confirmed: debounce
+                        if db.pending == nowInAir then
+                            db.ticks = db.ticks + 1
+                        else
+                            db.pending = nowInAir
+                            db.ticks   = 1
+                        end
+                        if db.ticks >= DEBOUNCE_TICKS then
+                            -- Stable new state — commit and refresh menus
+                            db.confirmed = nowInAir
+                            db.pending   = nil
+                            db.ticks     = 0
+                            playerObj._isFlying = nowInAir
+                            if nowInAir then
+                                CTLDTroopManager.getInstance():refreshMenuSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshRequestEquipmentSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj, true)
+                                CTLDVehicleSpawner.getInstance():refreshLoadSection(playerObj)
+                                CTLDVehicleSpawner.getInstance():refreshUnloadSection(playerObj)
+                                CTLDVehicleSpawner.getInstance():refreshParachuteVehicleSection(playerObj)
+                                CTLDJTACManager.getInstance():refreshJtacEquipmentSection(playerObj)
+                                ctld.utils.log("INFO", "CTLDPlayerManager: flight-state poller → TAKEOFF unit=%s", unitName)
+                            else
+                                CTLDTroopManager.getInstance():refreshMenuSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshRequestEquipmentSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshLoadCrateSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshUnpackSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj, false)
+                                CTLDVehicleSpawner.getInstance():refreshLoadSection(playerObj)
+                                CTLDVehicleSpawner.getInstance():refreshUnloadSection(playerObj)
+                                CTLDVehicleSpawner.getInstance():refreshParachuteVehicleSection(playerObj)
+                                CTLDJTACManager.getInstance():refreshJtacEquipmentSection(playerObj)
+                                for _, s in ipairs(inst._menuSections) do
+                                    if s.refreshMethod and s.manager and s.manager[s.refreshMethod] then
+                                        pcall(s.manager[s.refreshMethod], s.manager, playerObj)
+                                    end
+                                end
+                                ctld.utils.log("INFO", "CTLDPlayerManager: flight-state poller → LAND unit=%s", unitName)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return t + POLL_INTERVAL
+    end, nil, timer.getTime() + POLL_INTERVAL)
+
     ctld.utils.log("INFO", "CTLDPlayerManager: init complete")
 end
 
@@ -298,12 +376,17 @@ function CTLDPlayerManager:onLand(event)
     local playerObj = self._players[unitName]
     if not playerObj then return end
     local captured = playerObj
+    -- Clear flight flag immediately (not deferred) so any refresh between now and
+    -- the 1 s timer sees ground state and does not rebuild flight-only items (Pack Equipt).
+    captured._isFlying = false
     timer.scheduleFunction(function()
         CTLDTroopManager.getInstance():refreshMenuSection(captured)
         CTLDCrateManager.getInstance():refreshRequestEquipmentSection(captured)
         CTLDCrateManager.getInstance():refreshLoadCrateSection(captured)
         CTLDCrateManager.getInstance():refreshUnpackSection(captured)
-        CTLDCrateManager.getInstance():refreshCrateFlightSection(captured)
+        -- Pass overrideInAir=false: S_EVENT_LAND fires before inAir() crosses its threshold;
+        -- force ground state immediately rather than relying on the speed/AGL check.
+        CTLDCrateManager.getInstance():refreshCrateFlightSection(captured, false)
         CTLDVehicleSpawner.getInstance():refreshLoadSection(captured)
         CTLDVehicleSpawner.getInstance():refreshUnloadSection(captured)
         CTLDVehicleSpawner.getInstance():refreshParachuteVehicleSection(captured)
@@ -329,9 +412,14 @@ function CTLDPlayerManager:onTakeoff(event)
     if not unit then return end
     local playerObj = self._players[unit:getName()]
     if not playerObj then return end
+    -- Set flight flag immediately so any refresh between now and inAir() reaching threshold
+    -- (e.g. _refreshNearbyPackPlayers triggered by vehicle events) sees flight state.
+    playerObj._isFlying = true
     CTLDTroopManager.getInstance():refreshMenuSection(playerObj)
     CTLDCrateManager.getInstance():refreshRequestEquipmentSection(playerObj)
-    CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj)
+    -- Pass overrideInAir=true: S_EVENT_TAKEOFF fires before ctld.utils.inAir() crosses its speed/AGL
+    -- threshold, so we explicitly signal flight mode rather than relying on inAir() at this point.
+    CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj, true)
     CTLDVehicleSpawner.getInstance():refreshLoadSection(playerObj)
     CTLDVehicleSpawner.getInstance():refreshUnloadSection(playerObj)
     CTLDVehicleSpawner.getInstance():refreshParachuteVehicleSection(playerObj)

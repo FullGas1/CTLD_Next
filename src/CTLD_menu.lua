@@ -296,9 +296,11 @@ function ctld.Menu:addSubMenu(pathTable, menuName, opts)
         return { success = false, message = "Cannot add submenu under a command node", subMenuId = nil }
     end
 
-    -- Idempotent check
+    -- Idempotent check: if already exists, update mutable props (order, enabled) if provided.
     for _, child in ipairs(parent.children or {}) do
         if child.name == menuName and child.type == "submenu" then
+            if opts.order   ~= nil then child.order   = opts.order end
+            if opts.enabled ~= nil then child.enabled = opts.enabled end
             return { success = true, message = "Submenu already exists", subMenuId = child.id }
         end
     end

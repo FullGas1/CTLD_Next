@@ -2,9 +2,9 @@ return {
   default = {
     verbose  = true,
     coverage = false,
-    -- Discover *_spec.lua recursively under tests/
+    -- Discover *_spec.lua recursively under tests/ci/
     pattern  = "_spec",
     -- Helper loaded before every spec: stubs + CTLD modules
-    helper   = "tests/helpers/init.lua",
+    helper   = "tests/ci/helpers/init.lua",
   },
 }

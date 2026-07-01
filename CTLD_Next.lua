@@ -2,7 +2,7 @@
 ---@diagnostic disable
 
 -- ====================================================================================================
--- Start : lib/class.lua
+-- Start : core/class.lua
 ---@diagnostic disable
 -- class.lua
 -- Minimal OOP micro-framework for Lua 5.1 (DCS sandbox).
@@ -40,7 +40,7 @@ function class(base)
     return cls
 end
 
--- End : lib/class.lua
+-- End : core/class.lua
 -- ====================================================================================================
 -- Start : CTLD_config.lua
 -- CTLDConfig Singleton Class
@@ -2830,7 +2830,7 @@ ctld.i18n["es"]["CTLDZoneManager: zone config valid"]                           
 -- Start : CTLD_i18n_ko.lua
 --[[
     CTLD — Korean dictionary
-    Translation version: 1.9
+    Translation version: 1.8
 
     Translator: rising_star (original), Claude AI (RECON + new entries 2026-04-28)
     Note: weapon system proper nouns (BTR-D, BRDM-2, MLRS, etc.) are kept in their original form.
@@ -2840,7 +2840,7 @@ if not ctld then ctld = {} end
 if not ctld.i18n then ctld.i18n = {} end
 
 ctld.i18n["ko"] = {}
-ctld.i18n["ko"].translation_version = "1.9"
+ctld.i18n["ko"].translation_version = "1.8"
 
 --- groups names
 ctld.i18n["ko"]["Standard Group"] = "표준 그룹"
@@ -5284,7 +5284,7 @@ end
 --   local fid = timer.scheduleFunction(myLoop, nil, timer.getTime() + 5)
 --   ctld.scheduler.register("my_loop_name", fid)
 --
--- Shutdown (inject recette/shutdown_ctld.lua before re-injecting CTLD_Next):
+-- Shutdown (inject live_tests/shutdown_ctld.lua before re-injecting CTLD_Next):
 --   ctld.scheduler.cancelAll()
 -- ============================================================
 
@@ -5624,9 +5624,11 @@ function ctld.Menu:addSubMenu(pathTable, menuName, opts)
         return { success = false, message = "Cannot add submenu under a command node", subMenuId = nil }
     end
 
-    -- Idempotent check
+    -- Idempotent check: if already exists, update mutable props (order, enabled) if provided.
     for _, child in ipairs(parent.children or {}) do
         if child.name == menuName and child.type == "submenu" then
+            if opts.order   ~= nil then child.order   = opts.order end
+            if opts.enabled ~= nil then child.enabled = opts.enabled end
             return { success = true, message = "Submenu already exists", subMenuId = child.id }
         end
     end
@@ -5858,7 +5860,7 @@ end
 
 -- End : CTLD_menu.lua
 -- ====================================================================================================
--- Start : lib/CTLD_objectRegistry.lua
+-- Start : core/CTLD_objectRegistry.lua
 ---@diagnostic disable
 -- CTLD_objectRegistry.lua
 -- CTLDObjectRegistry — catalog of enriched DCS object descriptors + spawnObject() factory.
@@ -6359,9 +6361,9 @@ function CTLDObjectRegistry.spawnObject(objectKey, coalitionId, countryId, x, z,
     end
 end
 
--- End : lib/CTLD_objectRegistry.lua
+-- End : core/CTLD_objectRegistry.lua
 -- ====================================================================================================
--- Start : lib/CTLDParachuteEffect.lua
+-- Start : core/CTLDParachuteEffect.lua
 -- ============================================================
 -- CTLDParachuteEffect.lua
 -- Abstract interface + null implementation for virtual parachute side effects.
@@ -6414,9 +6416,9 @@ function CTLDParachuteEffect:onLanded(dropData) end  -- luacheck: ignore
 CTLDNullParachuteEffect = class(CTLDParachuteEffect)
 -- Inherits all three no-ops — zero overhead, safe default.
 
--- End : lib/CTLDParachuteEffect.lua
+-- End : core/CTLDParachuteEffect.lua
 -- ====================================================================================================
--- Start : lib/CTLD_modValidator.lua
+-- Start : core/CTLD_modValidator.lua
 ---@diagnostic disable
 -- CTLD_modValidator.lua
 -- Probes all DCS typeNames declared in CTLD configuration at mission start.
@@ -6769,7 +6771,7 @@ function CTLDModValidator:_probeHeliport(typeName, category, extras)
 end
 
 
--- End : lib/CTLD_modValidator.lua
+-- End : core/CTLD_modValidator.lua
 -- ====================================================================================================
 -- Start : CTLD_sceneManager.lua
 ---@diagnostic disable
@@ -9807,81 +9809,6 @@ function CTLDTroopManager:embarkFromField(unit)
 end
 
 -- ============================================================
--- Menu building
--- ============================================================
-
--- Builds the "Troop Transport" F10 sub-menu for a player.
--- Load entries are paginated at PAGE_SIZE items per DCS submenu level.
--- @param unit        DCS Unit object
--- @param groupId     DCS group id for missionCommands
--- @param parentPath  missionCommands parent path
-function CTLDTroopManager:buildMenu(unit, groupId, parentPath)
-    local unitName  = unit:getName()
-    local typeName  = unit:getTypeName()
-    local coalition = unit:getCoalition()
-
-    local troopPath = missionCommands.addSubMenuForGroup(groupId,
-        ctld.tr("Troop Transport"), parentPath)
-
-    -- "Unload / Extract Troops" (always present)
-    missionCommands.addCommandForGroup(groupId,
-        ctld.tr("Unload / Extract Troops"), troopPath,
-        function()
-            local u = Unit.getByName(unitName)
-            if u then CTLDTroopManager.getInstance():_menuUnloadOrExtract(u) end
-        end)
-
-    -- Transport capacity for this aircraft type
-    local limit = self:_transportLimit(typeName)
-
-    -- Filter applicable templates (not disabled + side + capacity)
-    local entries = {}
-    for _, tmpl in ipairs(self._templates) do
-        local sideOk = (tmpl.side == nil or tmpl.side == coalition)
-        local sizeOk = (tmpl.total <= limit)
-        if not tmpl.disabled and sideOk and sizeOk then
-            table.insert(entries, tmpl)
-        end
-    end
-
-    -- Paginated "Load X" entries (9 items per page, slot 0 = Unload already used)
-    local PAGE_SIZE = 9
-    local menuPath  = troopPath
-    local itemNb    = 0
-
-    for i, tmpl in ipairs(entries) do
-        if itemNb == PAGE_SIZE and i < #entries then
-            menuPath = missionCommands.addSubMenuForGroup(groupId,
-                ctld.tr("Next page"), menuPath)
-            itemNb = 0
-        end
-        local capturedTmpl = tmpl
-        missionCommands.addCommandForGroup(groupId,
-            ctld.tr("Load ") .. tmpl.name, menuPath,
-            function()
-                local u = Unit.getByName(unitName)
-                if not u then return end
-                local zone = CTLDZoneManager.getInstance():isUnitInZone(unitName, "pickup")
-                if not zone then
-                    trigger.action.outTextForGroup(u:getGroup():getID(),
-                        ctld.tr("You must be in a pickup zone to load troops."), 10)
-                    return
-                end
-                CTLDTroopManager.getInstance():embarkFromTroopZone(u, zone, capturedTmpl)
-            end)
-        itemNb = itemNb + 1
-    end
-
-    -- "Check Cargo"
-    missionCommands.addCommandForGroup(groupId,
-        ctld.tr("Check Cargo"), troopPath,
-        function()
-            local u = Unit.getByName(unitName)
-            if u then CTLDTroopManager.getInstance():_menuCheckCargo(u) end
-        end)
-end
-
--- ============================================================
 -- Polling / cleanup (called by CTLDCore)
 -- ============================================================
 
@@ -11370,8 +11297,11 @@ end
 CTLDCrateManager = class()
 
 local _cmInstance = nil
+CTLDCrateManager._instance = nil  -- class-level mirror for test isolation (reset via CTLDCrateManager._instance = nil)
 
 function CTLDCrateManager.getInstance()
+    -- Support test reset: if class-level _instance was set to nil externally, mirror that to the local var.
+    if CTLDCrateManager._instance == nil then _cmInstance = nil end
     if _cmInstance == nil then
         _cmInstance = setmetatable({}, CTLDCrateManager)
         _cmInstance.crates            = {}   -- [crateName] = CTLDCrate
@@ -11918,7 +11848,7 @@ end
 -- Visible only when on the ground — absent in flight.
 -- Lists repackable FARP scenes (within 300 m) and packable vehicles nearby.
 -- @param playerObj CTLDPlayer
-function CTLDCrateManager:refreshPackEquiptSection(playerObj)
+function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir)
     local farpEnabled    = ctld.gs("enableFARPRepack") == true
     local vehicleEnabled = ctld.gs("enablePackingVehicles") == true
     if not (farpEnabled or vehicleEnabled) then return end
@@ -11943,10 +11873,25 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj)
     end
 
     -- In-flight: submenu absent.
-    if ctld.utils.inAir(transport) then
+    -- overrideInAir: true = force flight, false = force ground, nil = use _isFlying flag / inAir().
+    local inAir
+    if overrideInAir ~= nil then
+        inAir = overrideInAir
+    elseif playerObj._isFlying ~= nil then
+        inAir = playerObj._isFlying
+    else
+        inAir = ctld.utils.inAir(transport)
+    end
+    if inAir then
+        -- clearBranch empties children but keeps the node in the tree (enabled=true).
+        -- setBranchEnabled hides it from DCS rendering on next refresh().
+        menu:setBranchEnabled({ root, cratesSub, packSub }, false)
         menu:refresh()
         return
     end
+
+    -- On ground: ensure node is visible before (re-)populating it.
+    menu:setBranchEnabled({ root, cratesSub, packSub }, true)
 
     -- Collect FARP scenes to pack.
     local scenes = {}
@@ -11961,8 +11906,9 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj)
         packableVehicles = CTLDVehicleSpawner.getInstance():findPackableVehicles(transport)
     end
 
-    -- If nothing to pack, do not add the submenu.
+    -- If nothing to pack, hide the submenu and return.
     if #scenes == 0 and #packableVehicles == 0 then
+        menu:setBranchEnabled({ root, cratesSub, packSub }, false)
         menu:refresh()
         return
     end
@@ -13676,7 +13622,7 @@ end
 --              Release Slingload, Cut Slingload (caps.canSlingload + slingloaded crate active).
 -- Called from buildMenuSection, onTakeoff, and onLand.
 -- @param playerObj CTLDPlayer
-function CTLDCrateManager:refreshCrateFlightSection(playerObj)
+function CTLDCrateManager:refreshCrateFlightSection(playerObj, overrideInAir)
     local caps = (ctld.gs("capabilitiesByType") or {})[playerObj.typeName]
     if not (playerObj.isTransport and caps and caps.cratesEnabled) then return end
 
@@ -13688,7 +13634,16 @@ function CTLDCrateManager:refreshCrateFlightSection(playerObj)
     local cratesSub = ctld.tr("Crate Commands")
 
     local transport = Unit.getByName(playerObj.unitName)
-    local inAir     = transport and transport:isExist() and ctld.utils.inAir(transport) or false
+    -- overrideInAir: true = force flight, false = force ground, nil = use _isFlying flag / inAir().
+    -- _isFlying is set by onTakeoff / onLand to bridge the gap before inAir() threshold settles.
+    local inAir
+    if overrideInAir ~= nil then
+        inAir = overrideInAir
+    elseif playerObj._isFlying ~= nil then
+        inAir = playerObj._isFlying
+    else
+        inAir = transport and transport:isExist() and ctld.utils.inAir(transport) or false
+    end
 
     -- Ground-only: visible only when landed
     if ctld.gs("loadCrateFromMenu") then
@@ -13697,7 +13652,7 @@ function CTLDCrateManager:refreshCrateFlightSection(playerObj)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("Drop Crate(s)") },      not inAir)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("Unpack Crate") },       not inAir)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("List Nearby Crates") }, not inAir)
-    self:refreshPackEquiptSection(playerObj)
+    self:refreshPackEquiptSection(playerObj, inAir)
 
     -- Parachute Crates: enabled only in air + CTLD crates loaded
     if caps.canParachuteDrop then
@@ -15263,7 +15218,7 @@ function CTLDVehicleSpawner:findPackableVehicles(transport)
 
     for _, veh in pairs(self._vehicles) do
         if veh:getState() == CTLDVehicle.STATE.WAITING then
-            local uName = veh.unitName
+            local uName = veh.spawnData and veh.spawnData.unitName
             if uName then
                 local liveRef = Unit.getByName(uName)
                 if liveRef and liveRef:isExist() then
@@ -16218,7 +16173,7 @@ end
 function CTLDFOBManager:buildMenuSection(playerObj, menu)
     local root   = ctld.tr("CTLD")
     local fobSub = ctld.tr("FOBs List")
-    menu:addSubMenu({ root }, fobSub, { order = 60 })
+    menu:addSubMenu({ root }, fobSub, { order = 55 })
 
     menu:addCommand({ root, fobSub }, ctld.tr("List active FOBs"),
         function(arg)
@@ -20829,6 +20784,84 @@ function CTLDPlayerManager:init()
     end
     CTLDPlayerManager._deferredSections = {}
 
+    -- Flight-state poller (0.5 s cadence).
+    -- S_EVENT_TAKEOFF / S_EVENT_LAND fire with a 3-5 s delay in DCS for helicopters.
+    -- This poller detects the inAir() transition immediately and triggers the same
+    -- refresh chain, so menus switch within 0.5 s of the actual state change.
+    -- onTakeoff / onLand still run when the events fire, but by then _isFlying already
+    -- matches the real state and the refresh is a fast no-op.
+    -- unitName → { confirmed=bool, pending=bool|nil, ticks=number }
+    -- confirmed: last state that triggered a menu refresh (nil = not yet seeded)
+    -- pending:   candidate new state (must hold for DEBOUNCE_TICKS consecutive polls)
+    -- ticks:     consecutive ticks the pending state has been seen
+    self._inAirDebounce = {}
+    local POLL_INTERVAL   = 0.5   -- seconds between checks
+    local DEBOUNCE_TICKS  = 2     -- require 2 consecutive same-state ticks (~1 s) before acting
+    local self_ref = self
+    timer.scheduleFunction(function(_, t)
+        local inst = self_ref
+        if not inst then return nil end
+        for unitName, playerObj in pairs(inst._players) do
+            local unit = Unit.getByName(unitName)
+            if unit and unit:isExist() then
+                local nowInAir = ctld.utils.inAir(unit)
+                local db = inst._inAirDebounce[unitName]
+                if not db then
+                    -- First encounter: seed confirmed state, no refresh needed (buildMenu ran already).
+                    inst._inAirDebounce[unitName] = { confirmed = nowInAir, pending = nil, ticks = 0 }
+                else
+                    if nowInAir == db.confirmed then
+                        -- State matches confirmed: reset pending
+                        db.pending = nil
+                        db.ticks   = 0
+                    else
+                        -- State differs from confirmed: debounce
+                        if db.pending == nowInAir then
+                            db.ticks = db.ticks + 1
+                        else
+                            db.pending = nowInAir
+                            db.ticks   = 1
+                        end
+                        if db.ticks >= DEBOUNCE_TICKS then
+                            -- Stable new state — commit and refresh menus
+                            db.confirmed = nowInAir
+                            db.pending   = nil
+                            db.ticks     = 0
+                            playerObj._isFlying = nowInAir
+                            if nowInAir then
+                                CTLDTroopManager.getInstance():refreshMenuSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshRequestEquipmentSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj, true)
+                                CTLDVehicleSpawner.getInstance():refreshLoadSection(playerObj)
+                                CTLDVehicleSpawner.getInstance():refreshUnloadSection(playerObj)
+                                CTLDVehicleSpawner.getInstance():refreshParachuteVehicleSection(playerObj)
+                                CTLDJTACManager.getInstance():refreshJtacEquipmentSection(playerObj)
+                                ctld.utils.log("INFO", "CTLDPlayerManager: flight-state poller → TAKEOFF unit=%s", unitName)
+                            else
+                                CTLDTroopManager.getInstance():refreshMenuSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshRequestEquipmentSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshLoadCrateSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshUnpackSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj, false)
+                                CTLDVehicleSpawner.getInstance():refreshLoadSection(playerObj)
+                                CTLDVehicleSpawner.getInstance():refreshUnloadSection(playerObj)
+                                CTLDVehicleSpawner.getInstance():refreshParachuteVehicleSection(playerObj)
+                                CTLDJTACManager.getInstance():refreshJtacEquipmentSection(playerObj)
+                                for _, s in ipairs(inst._menuSections) do
+                                    if s.refreshMethod and s.manager and s.manager[s.refreshMethod] then
+                                        pcall(s.manager[s.refreshMethod], s.manager, playerObj)
+                                    end
+                                end
+                                ctld.utils.log("INFO", "CTLDPlayerManager: flight-state poller → LAND unit=%s", unitName)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return t + POLL_INTERVAL
+    end, nil, timer.getTime() + POLL_INTERVAL)
+
     ctld.utils.log("INFO", "CTLDPlayerManager: init complete")
 end
 
@@ -20949,12 +20982,17 @@ function CTLDPlayerManager:onLand(event)
     local playerObj = self._players[unitName]
     if not playerObj then return end
     local captured = playerObj
+    -- Clear flight flag immediately (not deferred) so any refresh between now and
+    -- the 1 s timer sees ground state and does not rebuild flight-only items (Pack Equipt).
+    captured._isFlying = false
     timer.scheduleFunction(function()
         CTLDTroopManager.getInstance():refreshMenuSection(captured)
         CTLDCrateManager.getInstance():refreshRequestEquipmentSection(captured)
         CTLDCrateManager.getInstance():refreshLoadCrateSection(captured)
         CTLDCrateManager.getInstance():refreshUnpackSection(captured)
-        CTLDCrateManager.getInstance():refreshCrateFlightSection(captured)
+        -- Pass overrideInAir=false: S_EVENT_LAND fires before inAir() crosses its threshold;
+        -- force ground state immediately rather than relying on the speed/AGL check.
+        CTLDCrateManager.getInstance():refreshCrateFlightSection(captured, false)
         CTLDVehicleSpawner.getInstance():refreshLoadSection(captured)
         CTLDVehicleSpawner.getInstance():refreshUnloadSection(captured)
         CTLDVehicleSpawner.getInstance():refreshParachuteVehicleSection(captured)
@@ -20980,9 +21018,14 @@ function CTLDPlayerManager:onTakeoff(event)
     if not unit then return end
     local playerObj = self._players[unit:getName()]
     if not playerObj then return end
+    -- Set flight flag immediately so any refresh between now and inAir() reaching threshold
+    -- (e.g. _refreshNearbyPackPlayers triggered by vehicle events) sees flight state.
+    playerObj._isFlying = true
     CTLDTroopManager.getInstance():refreshMenuSection(playerObj)
     CTLDCrateManager.getInstance():refreshRequestEquipmentSection(playerObj)
-    CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj)
+    -- Pass overrideInAir=true: S_EVENT_TAKEOFF fires before ctld.utils.inAir() crosses its speed/AGL
+    -- threshold, so we explicitly signal flight mode rather than relying on inAir() at this point.
+    CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj, true)
     CTLDVehicleSpawner.getInstance():refreshLoadSection(playerObj)
     CTLDVehicleSpawner.getInstance():refreshUnloadSection(playerObj)
     CTLDVehicleSpawner.getInstance():refreshParachuteVehicleSection(playerObj)
@@ -24107,7 +24150,7 @@ end
 
 -- End : CTLD_core.lua
 -- ====================================================================================================
--- Start : compat/legacy_api.lua
+-- Start : legacy/legacy_api.lua
 -- ============================================================
 -- src/legacy/legacy_api.lua
 -- Legacy API compatibility wrappers — CTLD v1 → v2
@@ -24287,7 +24330,7 @@ function ctld.JTACAutoLaseStop(_jtacGroupName)
     CTLDJTACManager.getInstance():stopAutoLase(_jtacGroupName)
 end
 
--- End : compat/legacy_api.lua
+-- End : legacy/legacy_api.lua
 -- ====================================================================================================
 -- Start : CTLD_userConfig.lua
 -- ============================================================

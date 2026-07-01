@@ -13,7 +13,7 @@ tools/
 tests/            busted unit tests (no DCS required)
   helpers/        DCS stubs + module loader
   specs/          *_spec.lua test files
-live_tests/          Witchcraft integration tests (requires live DCS mission)
+tests/dcs/          Witchcraft integration tests (requires live DCS mission)
 docs/             This guide + missionmaker_guide.md + specs/
 assets/           Audio files (beacon.ogg)
 missions/         Demo and test .miz files
@@ -401,7 +401,7 @@ cfg.settings["debugScreenLogDuration"] = 20     -- screen display duration (seco
 
 ### 8.5 Test script output format
 
-All `live_tests/functional/F-xxx.lua` and `live_tests/scenarios/auto/*.lua` scripts
+All `tests/dcs/noPlayer/F-xxx.lua` and `tests/dcs/noPlayer/*.lua` scripts
 produce this format:
 
 ```text
@@ -418,7 +418,7 @@ If CTLD is already active in the mission, inject the cleanup script before re-in
 `CTLD_Next.lua`:
 
 ```bash
-node bridge.js "live_tests/dev/shutdown_ctld.lua"
+node bridge.js "tests/dcs/dev/shutdown_ctld.lua"
 ```
 
 Each functional test script calls `ctld_test.cleanup()` internally for its own scope —
