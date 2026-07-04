@@ -1,7 +1,7 @@
 # CTLD — Cahier de Conception Détaillée
 
 > **Langue** : Document rédigé en français.
-> **Version** : 0.1 (initial 2026-03-20) — révisé 2026-06-28 : noms de classes corrigés contre code final
+> **Version** : 1.0 (initial 2026-03-20) — révisé 2026-06-28 : noms de classes corrigés — post-project update 2026-07-04 : statuts classes, CTLDObjectRegistry, build system, évolutions
 > **Divergences majeures connues** :
 > - Les zones troupes ont migré de `PKZ_/EXZ_` vers `TRZ_` (voir [TroopZones_Architecture.md](TroopZones_Architecture.md))
 > - `CTLDZone` générique a été splitté : `CTLDTroopZone` (TRZ) + `CTLDLogisticZone` (LGZ)
@@ -74,8 +74,8 @@ CTLDCoreManager
   ├── CTLDi18n            (zéro dépendance)
   ├── CTLDUtils           (dépend de CTLDConfig)
   ├── ctld.MenuManager         (dépend de CTLDi18n)
-  ├── CTLDObjectsDescDb   (zéro dépendance)
-  ├── CTLDSceneManager    (dépend de CTLDObjectsDescDb, CTLDUtils)
+  ├── CTLDObjectRegistry   (zéro dépendance)
+  ├── CTLDSceneManager    (dépend de CTLDObjectRegistry, CTLDUtils)
   ├── CTLDZoneManager     (dépend de CTLDUtils, CTLDConfig)
   ├── CTLDTroopManager    (dépend de CTLDZoneManager, CTLDUtils, ctld.MenuManager)
   ├── CTLDCrateManager    (dépend de CTLDZoneManager, CTLDSceneManager, CTLDUtils, ctld.MenuManager)
@@ -126,8 +126,8 @@ classDiagram
         +addSubMenu(parent, label, groupId) Menu
         +addCommand(parent, label, groupId, cb, ...) Menu
     }
-    class CTLDObjectsDescDb {
-        +getInstance() CTLDObjectsDescDb
+    class CTLDObjectRegistry {
+        +getInstance() CTLDObjectRegistry
         +get(key) function
         +register(key, descFunc)
         +has(key) bool
@@ -315,7 +315,7 @@ classDiagram
     CTLDCrateManager --> CTLDCrate
     CTLDCrateAssemblyManager --> CTLDSceneManager
     CTLDVehicleSpawner --> CTLDVehicle
-    CTLDSceneManager --> CTLDObjectsDescDb
+    CTLDSceneManager --> CTLDObjectRegistry
     CTLDSceneManager --> CtldScene
     CTLDZoneManager --> CTLDZone
     CTLDTroopManager --> CTLDTroopGroup
@@ -444,7 +444,7 @@ classDiagram
 
 ---
 
-### 4.5 CTLDObjectsDescDb
+### 4.5 CTLDObjectRegistry
 
 **Responsabilité** : Registre singleton des descripteurs d'objets DCS utilisés par CTLDSceneManager. Chaque descripteur est une fonction retournant un `groupData` complet pour `coalition.addStaticObject()` ou `coalition.addGroup()`.
 
@@ -464,10 +464,10 @@ classDiagram
 
 | Signature | Description |
 |---|---|
-| `CTLDObjectsDescDb.getInstance()` | Singleton |
-| `CTLDObjectsDescDb:get(key)` | Retourne la fonction descripteur pour la clé |
-| `CTLDObjectsDescDb:register(key, descFunc)` | Enregistre un nouveau descripteur (extensibilité mission maker) |
-| `CTLDObjectsDescDb:has(key)` | Retourne true si la clé existe |
+| `CTLDObjectRegistry.getInstance()` | Singleton |
+| `CTLDObjectRegistry:get(key)` | Retourne la fonction descripteur pour la clé |
+| `CTLDObjectRegistry:register(key, descFunc)` | Enregistre un nouveau descripteur (extensibilité mission maker) |
+| `CTLDObjectRegistry:has(key)` | Retourne true si la clé existe |
 
 **Dépendances** : aucune
 
@@ -643,7 +643,7 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 **Responsabilité** : Gestion du transport de troupes. `CTLDTroopGroup` représente un groupe de troupes. `CTLDTroopManager` orchestre chargement, déchargement, extraction et construit le bloc de menu "Troop Transport".
 
 **Fichier cible** : `src/CTLD_troop.lua`
-**Statut** : 🆕 À créer (migration depuis `source/CTLD_core.lua`)
+**Statut** : ✅ Implémenté
 
 **Propriétés CTLDTroopGroup** :
 
@@ -676,7 +676,7 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 **Responsabilité** : Gestion du cycle de vie des caisses logistiques (spawn, chargement sling, dépose, déballage). L'unpack applique une logique de dispatch par priorité : scène DCS, système AA, ou spawn classique.
 
 **Fichier cible** : `src/CTLD_crate.lua`
-**Statut** : 🆕 À créer (migration depuis `source/CTLD_core.lua`)
+**Statut** : ✅ Implémenté
 
 **Propriétés CTLDCrate** :
 
@@ -719,7 +719,7 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 **Responsabilité** : Gestion du transport de véhicules et de la fonctionnalité pack (empaquetage d'un véhicule en caisse transportable). Contrainte `unitCanCarryVehicles` obligatoire pour afficher le bloc de menu.
 
 **Fichier cible** : `src/CTLD_vehicle.lua`
-**Statut** : 🆕 À créer (migration depuis `source/CTLD_core.lua`)
+**Statut** : ✅ Implémenté
 
 **Propriétés CTLDVehicle** :
 
@@ -755,7 +755,7 @@ Le séparateur de champs est `_`. **Aucun champ ne peut contenir `_`**.
 **Responsabilité** : Singleton gérant le cycle de vie des FOBs. La construction physique est déléguée à `CTLDSceneManager` via la scène `"FOB"`. Gère la détection des caisses FOB, le déclenchement du déploiement et l'enregistrement dans les unités logistiques.
 
 **Fichier cible** : `src/CTLD_fob.lua`
-**Statut** : 🆕 À créer (migration + refactoring depuis `source/CTLD_core.lua`)
+**Statut** : ✅ Implémenté
 
 **Modèle de scène FOB** (défini dans `src/scenes/CTLD_fobSceneDatas.lua`) :
 
@@ -1012,7 +1012,7 @@ end,
 **Responsabilité** : Orchestration principale côté joueur. `CTLDPlayer` représente l'état d'un joueur en jeu. `CTLDPlayerManager` détecte les entrées/sorties d'unité, détermine les capacités de l'appareil et délègue la construction des menus.
 
 **Fichier cible** : `src/CTLD_player.lua`
-**Statut** : 🆕 À créer (extraction depuis `source/CTLD_core.lua`)
+**Statut** : ✅ Implémenté
 
 **Propriétés CTLDPlayer** :
 
@@ -1022,7 +1022,7 @@ end,
 | `groupId` | `number` | ID DCS du groupe |
 | `coalition` | `number` | Coalition |
 | `typeName` | `string` | Type DCS de l'appareil |
-| `isTransport` | `bool` | L'appareil est dans `ctld.unitActions` |
+| `isTransport` | `bool` | L'appareil a une entrée dans `capabilitiesByType[typeName]` (config `addPlayerAircraftByType=true`) |
 | `canCarryVehicles` | `bool` | `unitCanCarryVehicles[typeName] == true` |
 | `loadedTroops` | `CTLDTroopGroup[]` | Troupes actuellement chargées |
 | `loadedCrates` | `CTLDCrate[]` | Caisses actuellement chargées |
@@ -1045,7 +1045,7 @@ buildMenu(player)
   └─ getOrCreateRootMenu(player.groupId, "CTLD")
         ├─ addCommand("Check Cargo")
         ├─ if player.isTransport:
-        │   ├─ CTLDTroopManager:buildMenu()           [COND: unitActions.troops]
+        │   ├─ CTLDTroopManager:buildMenu()           [COND: troopsEnabled=true]
         │   ├─ CTLDVehicleSpawner:buildMenu()         [COND: troops ET canCarryVehicles]
         │   ├─ CTLDCrateManager:buildMenu()           [COND: enableCrates ET crates ET NOT canCarryVehicles]
         │   ├─ CTLDCrateManager:buildCommandsMenu()   [COND: FOB OU crates]
@@ -1083,7 +1083,7 @@ init()
   2.  CTLDi18n:init()
   3.  CTLDUtils:init()
   4.  ctld.MenuManager:init()
-  5.  CTLDObjectsDescDb:init()
+  5.  CTLDObjectRegistry:init()
   6.  CTLDSceneManager:init()                -- enregistre FARP Alpha, mineField, FOB
   7.  CTLDZoneManager:discoverZones()        -- PKZ/WPZ/EXZ/LGZ depuis nommage DCS
   8.  CTLDZoneManager:_loadAIZonesFromConfig() -- AIZ depuis cfg.settings["aiZones"]
@@ -1113,7 +1113,7 @@ init()
 **Responsabilité** : Singleton gérant les systèmes AA multi-caisses (HAWK, Patriot, NASAMS, BUK, KUB, S-300). Le déploiement physique de chaque système est délégué à `CTLDSceneManager` via une scène dédiée par type de système. CTLDCrateAssemblyManager gère le registre runtime des systèmes assemblés, la logique de réarmement/réparation et les limites de coalition.
 
 **Fichier cible** : `src/CTLD_aasystem.lua`
-**Statut** : 🆕 À créer (migration depuis `source/CTLD_core.lua`)
+**Statut** : ✅ Implémenté
 
 **Principe d'intégration dans le flux unpack** : les caisses AA apparaissent dans le menu "Crates: Vehicle/FOB/Drone" comme n'importe quelle caisse. Quand `CTLDCrateManager:unpackCrate()` est appelé, si la caisse est reconnue par `CTLDCrateAssemblyManager:getSystemForCrate()`, le traitement est délégué à `CTLDCrateAssemblyManager:tryAssemble()` (ou tryRearm/tryRepair selon le contexte). Aucune commande de menu dédiée n'est créée.
 
@@ -1189,62 +1189,62 @@ Récapitulatif des paginations :
 
 ## 6. Système de build
 
-**Répertoire** : `build/`
+**Répertoire** : `tools/build/`
 
 | Fichier | Rôle |
 |---|---|
 | `listToMerge.txt` | Liste ordonnée des fichiers source à fusionner |
-| `merge.sh` | Script de fusion : concatène les fichiers → `CTLD.lua` |
+| `merge_CTLD.ps1` | Script PowerShell de fusion : concatène les fichiers → `CTLD_Next.lua` |
 
-**Ordre de fusion (`listToMerge.txt`)** :
+> Build : `powershell -ExecutionPolicy Bypass -File "tools\\build\\merge_CTLD.ps1"`
+
+**Ordre de fusion (`listToMerge.txt`)** (extrait 2026-07-04) :
 ```
-src/CTLD_config.lua
-src/CTLD_i18n.lua
-src/CTLD_utils.lua
-src/CTLD_menu.lua
-src/CTLD_objectsDescDb.lua
-src/CTLD_scene.lua
-src/CTLD_zone.lua
-src/CTLD_troop.lua
-src/CTLD_crate.lua
-src/CTLD_vehicle.lua
-src/CTLD_fob.lua
-src/CTLD_aasystem.lua
-src/CTLD_beacon.lua
-src/CTLD_recon.lua
-src/CTLD_jtac.lua
-src/CTLD_player.lua
-src/CTLD_core.lua
-src/scenes/CTLD_farpSceneDatas.lua
-src/scenes/CTLD_fobSceneDatas.lua
-src/scenes/CTLD_mineFieldSceneDatas.lua
-src/scenes/CTLD_aaHawkSceneDatas.lua
-src/scenes/CTLD_aaPatriotSceneDatas.lua
-src/scenes/CTLD_aaNasamSceneDatas.lua
-src/scenes/CTLD_aaBukSceneDatas.lua
-src/scenes/CTLD_aaKubSceneDatas.lua
-src/scenes/CTLD_aas300SceneDatas.lua
+-- Core foundations (no business state)
+core/class.lua
+CTLD_config.lua
+CTLD_i18n.lua  CTLD_i18n_en.lua  CTLD_i18n_fr.lua  CTLD_i18n_es.lua  CTLD_i18n_ko.lua
+CTLD_utils.lua
+CTLD_menu.lua
+core/CTLD_objectRegistry.lua
+core/CTLDParachuteEffect.lua
+core/CTLD_modValidator.lua
+-- Business domain managers
+CTLD_sceneManager.lua  CTLD_zone.lua  CTLD_troop.lua  CTLD_crate.lua
+CTLD_vehicle.lua  CTLD_fob.lua  CTLD_aasystem.lua  CTLD_beacon.lua
+CTLD_recon.lua  CTLD_jtac.lua  CTLD_player.lua
+-- Scene data
+scenes/CTLD_farpScene.lua  scenes/CTLD_fobScene.lua  scenes/CTLD_mineFieldScene.lua
+scenes/CTLD_countrysideFarpScene.lua  scenes/CTLD_farpAlphaScene.lua  scenes/CTLD_metalFarpScene.lua
+-- Orchestrator
+CTLD_core.lua
+-- Legacy API compatibility
+legacy/legacy_api.lua
+-- User configuration (always last)
 CTLD_userConfig.lua
 ```
 
+> Note : les scènes AA (HAWK, Patriot, NASAMS, BUK, KUB, S-300) sont intégrées dans
+> `CTLD_aasystem.lua` (données inline) — pas de fichier de scène séparé.
+
 ---
 
-## 7. Évolutions prévues
+## 7. Évolutions — toutes implémentées ✅
 
 | Réf | Description | Classe cible |
 |---|---|---|
-| EVO-01 | Menu "Unpack Any Crate" → sous-menu dynamique contextuel [PAG: 10/p] | CTLDCrateManager |
-| EVO-02 | Renommage pack → pack (config, menus, méthodes) | CTLDConfig, CTLDVehicleSpawner |
-| EVO-03 | FOB déployé via scène DCS | CTLDFOBManager |
-| EVO-04 | Nouveaux descripteurs : FOB_Outpost, FOB_Watchtower | CTLDObjectsDescDb |
-| EVO-05 | API mission maker `registerSceneModel()` documentée | documentation/missionmaker_guide.md |
-| EVO-06 | Remplacement `mist.dynAddStatic()` → `CTLDUtils.dynAddStatic()` | CTLDUtils, mineFieldSceneDatas |
-| EVO-07 | Spawn des systèmes AA via scènes DCS dédiées (6 scènes) | CTLDCrateAssemblyManager, CTLDSceneManager |
-| EVO-08 | Dispatch unpack() : priorité scène → AA system → classique | CTLDCrateManager |
-| EVO-09 | Suppression du chargement virtuel de véhicules depuis pickupZone — voir détail ci-dessous | CTLDZoneManager, CTLDVehicleSpawner |
-| EVO-10 | Convention de nommage DCS pour déclaration des zones sans scripting — voir section 4.6 | CTLDZoneManager |
-| EVO-11a | logisticZone : suppression de l'objet statique DCS comme ancre — remplacé par trigger zone LGZ | CTLDZoneManager |
-| EVO-11b | logisticZone : suppression de l'interdiction d'unpack en zone logistique — unpack autorisé partout ; `farEnoughFromLogisticZone` supprimé | CTLDZoneManager, CTLDCrateManager |
+| ✅ EVO-01 [2026-05-xx] | Menu "Unpack Any Crate" → sous-menu dynamique contextuel [PAG: 10/p] | CTLDCrateManager |
+| ✅ EVO-02 [2026-05-17] | Renommage repack → pack (config, menus, méthodes) | CTLDConfig, CTLDVehicleSpawner |
+| ✅ EVO-03 | FOB déployé via scène DCS | CTLDFOBManager |
+| ✅ EVO-04 | Nouveaux descripteurs : FOB_Outpost, FOB_Watchtower | CTLDObjectRegistry |
+| ✅ EVO-05 | API mission maker `registerSceneModel()` documentée | documentation/missionmaker_guide.md |
+| ✅ EVO-06 | Remplacement `mist.dynAddStatic()` → `CTLDUtils.dynAddStatic()` | CTLDUtils, mineFieldScene |
+| ✅ EVO-07 | Spawn des systèmes AA via données inline dans CTLDCrateAssemblyManager.TEMPLATES | CTLDCrateAssemblyManager |
+| ✅ EVO-08 | Dispatch unpack() : priorité scène → AA system → classique | CTLDCrateManager |
+| ✅ EVO-09 | Suppression du chargement virtuel de véhicules depuis pickupZone | CTLDZoneManager, CTLDVehicleSpawner |
+| ✅ EVO-10 | Convention de nommage DCS TRZ_/WPZ_/LGZ_ | CTLDZoneManager |
+| ✅ EVO-11a | logisticZone : trigger zone LGZ (plus d'ancre objet statique) | CTLDZoneManager |
+| ✅ EVO-11b | logisticZone : unpack autorisé partout ; `farEnoughFromLogisticZone` supprimé | CTLDZoneManager, CTLDCrateManager |
 
 ### EVO-09 — Refonte du transport de véhicules (décision 2026-03-21)
 

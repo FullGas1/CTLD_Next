@@ -1179,7 +1179,7 @@ Minor cleanups identified — low priority, no functional impact.
   • ~~`maximumSearchDistance`~~ ✅ — câblé dans `_assignPostSpawnTask` `AttackNearestEnemyOnLos` (remplace hardcode 10000) ; recette F-B4-1→F-B4-3 3/3 PASS [2026-05-19]
   • ~~`maximumMoveDistance`~~ ✅ — supprimé de `CTLD_config.lua` + `CTLD_userConfig.lua` [2026-05-19]. V2 n'a pas d'errance aléatoire : `_assignPostSpawnTask` utilise des tâches explicites (`gotoNearestWPZ` / `AttackNearestEnemyOnLos`), pas de fallback random.
   • ~~`unitLoadLimits`~~ — absorbé par Feature P ✅ (`maxTroopsOnboard` dans `capabilitiesByType`)
-  • `vehiclesForTransportRED/BLUE` + `maxVehiclesByType` — fusionnés en `vehicleTransportCapabilities` [2026-05-17] (Feature Q)
+  • ✅ `vehiclesForTransportRED/BLUE` + `maxVehiclesByType` — fusionnés en `vehicleTransportCapabilities` [2026-05-17] (Feature Q)
 
 - ~~**CL-9**~~ ✅ `ctld.pickupZones` → instanciation en CTLDTroopZone [2026-05-19]
   Analyse : instanciation correcte pour trigger zones. Deux gaps identifiés et corrigés :
@@ -1195,8 +1195,8 @@ Minor cleanups identified — low priority, no functional impact.
 - ✅ **CL-11** Renommage `dynamic` → `NativeDcsCargoSystem` — **décision : Option A, statu quo**
   Analyse : clé `"dynamic"` rarement surchargée par les MMs, breaking change non nul pour gain de lisibilité marginal. Cohérence avec `CTLD_zone.lua:isDynamic()` (contexte différent). Pas de modification de code.
 
-- **POST-PROJECT** Mise à jour specs techniques (`docs/specs/`)
-  Une fois le projet finalisé : relire tous les fichiers de `docs/specs/` et les mettre à jour pour refléter le code implémenté (Feature Q, Feature O, CL-9/10, capabilitiesByType, menu order, etc.). Objectif : faciliter la maintenance future en ayant des specs conformes au code livré.
+- ✅ **POST-PROJECT** Mise à jour specs techniques (`migration/specs/`) [2026-07-04]
+  `CTLD_DesignSpec.md` : statuts classes (tous ✅), CTLDObjectsDescDb → CTLDObjectRegistry, isTransport/unitActions → capabilitiesByType, build system (`tools/build/`, `merge_CTLD.ps1`), EVOs tous ✅. Autres specs déjà à jour (2026-06-28/29).
 
 - ~~**CL-12**~~ ✅ Refonte README [2026-06-29]
   Toutes sections v2 documentées : capabilitiesByType, zone naming conventions (TRZ_/LGZ_/WPZ_),
