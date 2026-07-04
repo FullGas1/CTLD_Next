@@ -1231,8 +1231,7 @@ function CTLDCrateManager:_checkNativeDCSCargo()
                 for _, entry in ipairs(transports) do
                     local vel  = entry.transport:getVelocity()
                     local spd2 = vel.x * vel.x + vel.y * vel.y + vel.z * vel.z
-                    if spd2 > 0.25 then goto nextTransport end
-                    if _pointInBBox(entry.unitPos, entry.bbox, cratePos, 0.5) then
+                    if spd2 <= 0.25 and _pointInBBox(entry.unitPos, entry.bbox, cratePos, 0.5) then
                         -- Memorize local-frame offset for drift-based unload detection.
                         local up = entry.unitPos
                         local dx = cratePos.x - up.p.x
@@ -1308,7 +1307,6 @@ function CTLDCrateManager:_checkNativeDCSCargo()
                         end
                         break
                     end
-                    ::nextTransport::
                 end
 
             -- ── UNLOAD detection ───────────────────────────────────────────

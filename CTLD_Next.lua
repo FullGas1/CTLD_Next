@@ -613,7 +613,7 @@ function CTLDConfig:load()
         ["C-130J-30"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
-            maxTroopsOnboard = 80,  maxCratesOnboard = 20,  maxWholeVehiclesOnboard = 2,
+            maxTroopsOnboard = 80,  maxCratesOnboard = 22,  maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
             loadableVehiclesBLUE = { "M1045 HMMWV TOW", "M1043 HMMWV Armament", "Hummer" },
@@ -5062,6 +5062,20 @@ end
 
 -- ====================================================================================================
 -- SECTION: Spawn positions on a random axis (used by CTLDCrateManager and CTLDSceneManager)
+-- Local bbox containment helper (mirrors CTLDCrateManager._pointInBBox).
+-- Returns true if world point pt lies inside the bbox of a unit described by unitPos + bbox.
+local function _pointInBBoxLocal(unitPos, bbox, pt, margin)
+    margin = margin or 0
+    local dx = pt.x - unitPos.p.x
+    local dy = pt.y - unitPos.p.y
+    local dz = pt.z - unitPos.p.z
+    local lx = dx * unitPos.x.x + dy * unitPos.x.y + dz * unitPos.x.z
+    local ly = dx * unitPos.y.x + dy * unitPos.y.y + dz * unitPos.y.z
+    local lz = dx * unitPos.z.x + dy * unitPos.z.y + dz * unitPos.z.z
+    return lx >= (bbox.min.x - margin) and lx <= (bbox.max.x + margin)
+       and ly >= (bbox.min.y - margin) and ly <= (bbox.max.y + margin)
+       and lz >= (bbox.min.z - margin) and lz <= (bbox.max.z + margin)
+end
 -- Computes N absolute world positions along a single random axis (full 360° relative to unit heading).
 -- Used for:
 --   - CTLDCrateManager: pack and virtual unload (crate wave dispersion)
@@ -5079,7 +5093,13 @@ end
 -- Clock convention: 0° ahead = 12 o'clock, 90° right = 3 o'clock, 180° behind = 6 o'clock.
 -- ====================================================================================================
 
-function ctld.utils.getSpawnObjectPositions(unit, n, safeDistance, spacing, axisOffsetDeg)
+-- @param avoidBBoxes  array|nil  list of { unitPos, bbox } tables (DynamicCargo transports to avoid).
+--                                 Each entry must have the same structure as CTLDCrateManager._checkNativeDCSCargo
+--                                 transports: { unitPos = unit:getPosition(), bbox = desc.box }.
+--                                 When provided, the chosen axis is rotated by 45° increments (up to 8 tries)
+--                                 until all candidate positions are outside every listed bbox.
+--                                 Falls back to the original axis if no free slot is found after 8 tries.
+function ctld.utils.getSpawnObjectPositions(unit, n, safeDistance, spacing, axisOffsetDeg, avoidBBoxes)
     n             = n or 1
     spacing       = spacing or (ctld.gs and ctld.gs("crateSpacing")) or 5
 
@@ -5091,20 +5111,53 @@ function ctld.utils.getSpawnObjectPositions(unit, n, safeDistance, spacing, axis
         axisOffsetDeg = ctld.utils.RandomReal("getSpawnObjectPositions", 0, 360)
     end
 
-    local positions = {}
-    for i = 1, n do
-        local dist   = safeDistance + (i - 1) * spacing
-        local pt     = ctld.utils.GetRelativeVec2Coords(
-            { x = unitPos.x, y = unitPos.z },
-            unitHdg,
-            dist,
-            axisOffsetDeg
-        )
-        positions[i] = { x = pt.x, z = pt.y }
+    -- Helper: compute candidate positions for a given axis angle.
+    local function _candidates(axisDeg)
+        local pts = {}
+        for i = 1, n do
+            local dist = safeDistance + (i - 1) * spacing
+            local pt   = ctld.utils.GetRelativeVec2Coords(
+                { x = unitPos.x, y = unitPos.z },
+                unitHdg,
+                dist,
+                axisDeg
+            )
+            pts[i] = { x = pt.x, z = pt.y }
+        end
+        return pts
+    end
+
+    -- Helper: returns true if any candidate point falls inside any avoided bbox.
+    -- Uses a 2-D ground-plane check (y=0) so we don't need a full unit:getPosition() here —
+    -- the avoidBBoxes entries already carry unitPos from _checkNativeDCSCargo.
+    local function _anyCollision(pts)
+        if not avoidBBoxes or #avoidBBoxes == 0 then return false end
+        for _, avoid in ipairs(avoidBBoxes) do
+            for _, pt in ipairs(pts) do
+                local pt3 = { x = pt.x, y = avoid.unitPos.p.y, z = pt.z }
+                if _pointInBBoxLocal(avoid.unitPos, avoid.bbox, pt3, 0.5) then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local chosenAxis = axisOffsetDeg
+    local positions  = _candidates(chosenAxis)
+
+    if avoidBBoxes and #avoidBBoxes > 0 then
+        -- Rotate by 45° increments until all positions are clear (max 8 attempts = full circle).
+        for attempt = 1, 7 do
+            if not _anyCollision(positions) then break end
+            chosenAxis = (chosenAxis + 45) % 360
+            positions  = _candidates(chosenAxis)
+        end
+        -- If still colliding after 8 tries, keep last computed positions (best effort).
     end
 
     -- Clock bearing: axisOffsetDeg (0=12h, 30=1h, ..., 330=11h)
-    local clockNum = math.floor(axisOffsetDeg / 30 + 0.5) % 12
+    local clockNum = math.floor(chosenAxis / 30 + 0.5) % 12
     if clockNum == 0 then clockNum = 12 end
 
     return {
@@ -12253,12 +12306,17 @@ function CTLDCrateManager:_checkNativeDCSCargo()
             local cratePos = dcsStatic:getPoint()
 
             -- ── LOAD detection ─────────────────────────────────────────────
-            -- ── LOAD detection ─────────────────────────────────────────────
             -- Crate is on ground AND its static is inside a transport's bbox.
             -- 0.5 m margin to account for attachment offsets.
+            -- Speed guard: DCS Dynamic Cargo UI is only accessible when the aircraft
+            -- is stationary on the ground.  A transport that is taxiing can sweep its
+            -- bbox over a parked crate and trigger a false positive.  We reject any
+            -- entry whose ground-speed exceeds 0.5 m/s (speed² > 0.25).
             if crate:isOnGround() then
                 for _, entry in ipairs(transports) do
-                    if _pointInBBox(entry.unitPos, entry.bbox, cratePos, 0.5) then
+                    local vel  = entry.transport:getVelocity()
+                    local spd2 = vel.x * vel.x + vel.y * vel.y + vel.z * vel.z
+                    if spd2 <= 0.25 and _pointInBBox(entry.unitPos, entry.bbox, cratePos, 0.5) then
                         -- Memorize local-frame offset for drift-based unload detection.
                         local up = entry.unitPos
                         local dx = cratePos.x - up.p.x
@@ -12581,6 +12639,28 @@ function CTLDCrateManager:_isDynamicCapable(unit)
     return caps ~= nil and caps.useNativeDcsCargoSystem == true
 end
 
+--- Returns bbox descriptors for all DynamicCargo-capable transports except the requester.
+-- Used by spawnCratesAligned to avoid spawning crates inside a neighbour's bbox.
+-- @param requester  DCS Unit  the aircraft that requested the spawn (excluded from results)
+-- @return array of { unitPos = unit:getPosition(), bbox = desc.box }
+function CTLDCrateManager:_getDynamicBBoxes(requester)
+    local pm      = CTLDPlayerManager.getInstance()
+    local result  = {}
+    local reqName = requester:getName()
+    for unitName, _ in pairs(pm._players) do
+        if unitName ~= reqName then
+            local u = Unit.getByName(unitName)
+            if u and u:isExist() and self:_isDynamicCapable(u) then
+                local desc = u:getDesc()
+                if desc and desc.box then
+                    result[#result + 1] = { unitPos = u:getPosition(), bbox = desc.box }
+                end
+            end
+        end
+    end
+    return result
+end
+
 --- Resolve the spawnableCratesModels key for a given transport unit.
 -- Returns "dynamic" if the unit is in dynamicCargoUnits and slingLoad is off,
 -- "sling" if slingLoad is enabled, "load" otherwise.
@@ -12745,7 +12825,11 @@ function CTLDCrateManager:spawnCratesAligned(descriptors, transport, coalitionId
     local safeDist  = (ctld.utils.getSecureDistanceFromUnit(transport:getName()) or 10) + 5
     local spacing   = (ctld.gs and ctld.gs("crateSpacing")) or 5
     local n         = #descriptors
-    local spawnInfo = ctld.utils.getSpawnObjectPositions(transport, n, safeDist, spacing, axisOffsetDeg)
+    -- Build avoid list: all DynamicCargo-capable transports near the spawning unit.
+    -- Prevents freshly spawned crates from landing inside another aircraft's bbox,
+    -- which would immediately trigger a false DCS-native load detection.
+    local avoidBBoxes = self:_getDynamicBBoxes(transport)
+    local spawnInfo = ctld.utils.getSpawnObjectPositions(transport, n, safeDist, spacing, axisOffsetDeg, avoidBBoxes)
     local spawned   = 0
     for i, descriptor in ipairs(descriptors) do
         local pos = spawnInfo.positions[i]

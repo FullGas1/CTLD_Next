@@ -57,7 +57,6 @@ local MENU_NAME       = "Recette CTLD"
 local MENU_PATH       = { ctld.tr("CTLD"), MENU_NAME }
 local AI_UNIT_NAME    = "CTLD_AI_TEST_u1"
 local AI_GROUP_NAME   = "CTLD_AI_TEST"
-local TRZ_NAME        = "pz1"
 
 -- ── 6. State ─────────────────────────────────────────────────────────────────
 local S = {
@@ -69,6 +68,7 @@ local S = {
     timerHandle = nil,
     timerGen    = 0,
     transport   = nil,
+    aizZoneName = nil,
 }
 
 -- ── 7. Helpers ───────────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ end
 steps[1] = function()
     instruct(
         "Step 1/3 — SPAWN AI HELI (auto)\n"..
-        "Spawn AI UH-1H dans TRZ pz1 + enregistrement transportPilotNames.\n"..
+        "Spawn AI UH-1H dans une AIZ pickup zone + enregistrement transportPilotNames.\n"..
         "Observation sur F10 map — les troupes apparaissent autour de l'hélico."
     )
 
@@ -227,21 +227,34 @@ steps[1] = function()
         and blueUnits[1]:getCountry()
         or country.id.USA
 
+    -- Find the first active AIZ pickup zone with troops (isAIPickup=true, _aiTroopStock set)
     local zm   = CTLDZoneManager.getInstance()
-    local zone = zm._troopZones[TRZ_NAME]
+    local zone = nil
+    local zoneName = nil
+    for zname, z in pairs(zm._troopZones) do
+        if z.active and z:hasAIPickup() and z._aiTroopStock then
+            zone = z ; zoneName = zname ; S.aizZoneName = zname ; break
+        end
+    end
     if not zone then
-        fail("AI-VIS.1.1", "TRZ zone '"..TRZ_NAME.."' non trouvée")
+        fail("AI-VIS.1.1", "No active AIZ pickup zone with troops found")
         advanceStep()
         return
     end
 
-    check("AI-VIS.1.1", "TRZ pz1 found and active", zone.active,
+    check("AI-VIS.1.1", "AIZ pickup zone found: "..zoneName, zone.active,
         "active=" .. tostring(zone.active))
 
     local zpt = zone.center
     local oldGrp = Group.getByName(AI_GROUP_NAME)
     if oldGrp and oldGrp:isExist() then oldGrp:destroy() end
 
+    -- Note: coalition.addGroup always starts helicopters airborne (inAir()=true).
+    -- S_EVENT_LAND is unreliable without a proper mission route from an airbase.
+    -- F-133/F-134 (pickup/dropoff logic) are already covered by noPlayer mock scenario.
+    -- This visual scenario calls onAILand() directly after spawn to trigger the pickup
+    -- and show troops appearing on the F10 map — the visual effect is identical.
+    local groundH = land.getHeight({ x = zpt.x, y = zpt.z })
     local grp = coalition.addGroup(blueCountry, Group.Category.HELICOPTER, {
         name       = AI_GROUP_NAME,
         task       = "Transport",
@@ -254,7 +267,7 @@ steps[1] = function()
             type          = "UH-1H",
             x             = zpt.x,
             y             = zpt.z,
-            alt           = zpt.y,
+            alt           = groundH + 5,
             heading       = 0,
             skill         = "Excellent",
             unitId        = math.random(88000, 88999),
@@ -279,48 +292,61 @@ steps[1] = function()
             "playerName=" .. tostring(aiUnit:getPlayerName()))
     end
 
-    log("AI heli spawné à "..TRZ_NAME.." — poll hasTroops dans 3s")
+    log("AI heli spawné à "..tostring(zoneName).." — onAILand direct dans 2s")
 
-    -- S2 sera lancé automatiquement : poll toutes les 2s, timeout 30s
-    waitThen(3, function() advanceStep() end)
+    -- Direct call to onAILand after 2s: coalition.addGroup always spawns helis airborne
+    -- so S_EVENT_LAND never fires at spawn. F-133/F-134 are covered in noPlayer mocks.
+    -- This visual scenario focuses on showing the troop-spawn effect on the F10 map.
+    waitThen(2, function() advanceStep() end)
 end
 
--- S2 — Poll hasTroops (auto via waitFor)
+-- S2 — Force onAILand (direct call) then verify hasTroops
 steps[2] = function()
     instruct(
-        "Step 2/3 — VÉRIFICATION AUTO-PICKUP (auto)\n"..
-        "Attente que l'hélico AI embarque des troupes (max 30s)…\n"..
-        "Observer sur F10 map."
+        "Step 2/3 — PICKUP (direct onAILand)\n"..
+        "Appel direct onAILand → troupes chargées dans l'hélico.\n"..
+        "Observer les troupes sur F10 map autour de "..tostring(S.aizZoneName).."."
     )
 
-    waitFor(
-        function()
-            local ok, tm = pcall(CTLDTroopManager.getInstance)
-            return ok and tm and tm:hasTroops(AI_UNIT_NAME)
-        end,
-        2, 30,
-        function()
-            -- Succès : log le manifest
-            local ok, tm = pcall(CTLDTroopManager.getInstance)
-            if ok and tm then
-                local list  = tm:getInTransit(AI_UNIT_NAME) or {}
-                local total = 0
-                local names2 = {}
-                for _, grp in ipairs(list) do
-                    total = total + (grp.unitTotal or 0)
-                    table.insert(names2, grp.templateName or "?")
-                end
-                log("Cargo manifest: " .. total .. " soldat(s) — " .. table.concat(names2, ", "))
+    local aiUnit = Unit.getByName(AI_UNIT_NAME)
+    if not aiUnit or not aiUnit:isExist() then
+        fail("AI-VIS.2.0", "AI unit not found at step 2")
+        advanceStep()
+        return
+    end
+
+    -- Direct onAILand call: simulates S_EVENT_LAND at the AIZ pickup zone.
+    local ok2, err2 = pcall(function()
+        CTLDCoreManager.getInstance():onAILand({
+            id        = world.event.S_EVENT_LAND,
+            initiator = aiUnit,
+        })
+    end)
+    if not ok2 then
+        fail("AI-VIS.2.1", "onAILand error: " .. tostring(err2))
+        advanceStep()
+        return
+    end
+
+    -- Check hasTroops immediately after
+    waitThen(1, function()
+        local okTM, tm = pcall(CTLDTroopManager.getInstance)
+        local hasTr = okTM and tm and tm:hasTroops(AI_UNIT_NAME)
+        if hasTr then
+            local list  = tm:getInTransit(AI_UNIT_NAME) or {}
+            local total = 0 ; local names2 = {}
+            for _, grp in ipairs(list) do
+                total = total + (grp.unitTotal or 0)
+                table.insert(names2, grp.templateName or "?")
             end
-            pass("AI-VIS.2.1", "hasTroops=true après auto-pickup")
-            advanceStep()
-        end,
-        function()
-            fail("AI-VIS.2.1", "timeout 30s — hasTroops toujours false")
-            log("⚠️ Vérifier CTLD.log pour _checkAIStatus / INIT-A. L'hélico est-il bien dans pz1 ?")
-            advanceStep()
+            log("Cargo manifest: " .. total .. " soldat(s) — " .. table.concat(names2, ", "))
+            pass("AI-VIS.2.1", "hasTroops=true — " .. total .. " soldat(s) chargé(s)")
+        else
+            fail("AI-VIS.2.1", "hasTroops=false après onAILand direct")
         end
-    )
+        -- Leave heli alive 10s so player can observe troops on F10 map
+        waitThen(10, function() advanceStep() end)
+    end)
 end
 
 -- S3 — Cleanup
