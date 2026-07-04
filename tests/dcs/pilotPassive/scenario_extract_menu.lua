@@ -1,50 +1,147 @@
 ---@diagnostic disable
 -- =============================================================================
--- scenario_extract_menu.lua
--- CTLDTroopManager — extract-from-field menu logic (single vs multi-group)
+-- live_tests/scenarios/interactive/scenario_extract_menu.lua
+-- CTLD — Extract-from-field menu logic (single vs multi-group)
 --
 -- Test cases:
 --   F-145 : 1 dropped group nearby → direct "Extract: <name>" command (no subMenu)
 --   F-146 : 2+ dropped groups nearby → "Extract from field" subMenu
 --           with distance-annotated entries for each group
 --
+-- Cinématique (1 step auto) :
+--   S1 [auto]  Toutes les vérifications menu F-145/F-146
+--
 -- Pre-requisites:
 --   - CTLD fully initialised (inject CTLD_Next.lua + 5s wait)
---   - recette/enable_debug.lua injected before this scenario
+--
+-- @scenario  EXTRACT-MENU
+-- @version   3.0 — 2026-06-30
+-- @coverage  F-145, F-146
 -- =============================================================================
 
--- ── Witchcraft guard ─────────────────────────────────────────────────────────
+-- ── 1. Witchcraft guard ──────────────────────────────────────────────────────
 if not ctld or not ctld.utils then
     trigger.action.outText("[EXTRACT-MENU] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
     return Witchcraft
 end
 
-local cfg = CTLDConfig.get()
-local _saved_debug = cfg.settings["debug"]
+-- ── 2. Double-injection guard ────────────────────────────────────────────────
+if _SCN_EXTRACT_MENU_RUNNING then
+    trigger.action.outText("[EXTRACT-MENU] déjà actif — attendre la fin ou redémarrer DCS.", 10)
+    return Witchcraft
+end
+_SCN_EXTRACT_MENU_RUNNING = true
+_SCN_EXTRACT_MENU_CLEANUP = nil
+
+-- ── 3. Global show callback ───────────────────────────────────────────────────
+_SCN_EXTRACT_MENU_INSTR = ""
+_SCN_EXTRACT_MENU_SHOW  = function()
+    trigger.action.outText(_SCN_EXTRACT_MENU_INSTR, 30)
+end
+
+do  -- isolation scope
+-- ── 4. Debug ON ──────────────────────────────────────────────────────────────
+local cfg                  = CTLDConfig.get()
+local _savedDebug          = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
-cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debug"]          = true
+cfg.settings["debugScreenLog"] = false
 
-local TAG    = "[EXTRACT-MENU]"
-local START  = os.date("%Y-%m-%d %H:%M:%S")
-local STEP_N = "_EXTRACT_MENU_STEP"
+-- ── 5. Constants ─────────────────────────────────────────────────────────────
+local TAG             = "[EXTRACT-MENU]"
+local NAME            = "Extract-from-field menu logic"
+local MENU_NAME       = "Recette CTLD"
+local MENU_PATH       = { ctld.tr("CTLD"), MENU_NAME }
 
-local function log(msg)    ctld.utils.log("INFO", TAG .. " " .. msg) end
-local function report(msg) trigger.action.outText(TAG .. " " .. msg, 30); log(msg) end
-local function pass(msg)   report("[PASS] " .. msg) end
-local function fail(msg)
-    local trace = debug.traceback(msg, 2)
-    trigger.action.outText(TAG .. " !! FAIL: " .. msg, 60)
-    log("FAIL: " .. trace)
-    error(msg)
+-- ── 6. State ─────────────────────────────────────────────────────────────────
+local S = {
+    step        = 0,
+    passed      = 0,
+    failed      = 0,
+    failReasons = {},
+    groupId     = nil,
+    timerHandle = nil,
+    timerGen    = 0,
+    transport   = nil,
+}
+
+-- ── 7. Helpers ───────────────────────────────────────────────────────────────
+local function log(msg) ctld.utils.log("INFO", "%s %s", TAG, msg) end
+
+local function instruct(msg)
+    _SCN_EXTRACT_MENU_INSTR = TAG .. "\n" .. msg
+    log("[INSTR] " .. msg)
+    trigger.action.outText(_SCN_EXTRACT_MENU_INSTR, 360, true)
 end
+
+local function pass(id, msg) S.passed = S.passed + 1 ; log("[PASS] "..id..": "..(msg or "")) end
+local function fail(id, msg) S.failed = S.failed + 1 ; table.insert(S.failReasons, id..": "..(msg or "")) ; log("[FAIL] "..id..": "..(msg or "")) end
+
 local function check(id, desc, cond, details)
-    if cond then pass(id .. " — " .. desc)
-    else fail(id .. " — " .. desc .. (details and (" | " .. details) or "")) end
+    if cond then pass(id, desc)
+    else fail(id, desc .. (details and (" | " .. details) or "")) end
 end
 
--- ── HELPERS ───────────────────────────────────────────────────────────────────
+-- ── 8. Cleanup ───────────────────────────────────────────────────────────────
+local function cleanup()
+    if S.timerHandle then timer.removeFunction(S.timerHandle) ; S.timerHandle = nil end
+    if S.groupId then
+        local mm = ctld.MenuManager:getInstance()
+        local menu = mm and mm:getMenuByGroupId(S.groupId)
+        if menu then
+            pcall(function()
+                menu:clearBranch(MENU_PATH)
+                menu:setBranchEnabled(MENU_PATH, false)
+                menu:refresh()
+            end)
+        end
+    end
+    _SCN_EXTRACT_MENU_INSTR = nil ; _SCN_EXTRACT_MENU_SHOW = nil
+    cfg.settings["debug"]          = _savedDebug
+    cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+    _SCN_EXTRACT_MENU_RUNNING = false
+    _SCN_EXTRACT_MENU_CLEANUP = nil
+    log("cleanup done")
+end
 
+-- ── 9. Timer helpers ─────────────────────────────────────────────────────────
+local function cancelTimer()
+    S.timerGen = S.timerGen + 1
+    if S.timerHandle then
+        pcall(timer.removeFunction, S.timerHandle)
+        S.timerHandle = nil
+    end
+end
+
+-- ── 10. Finalization ─────────────────────────────────────────────────────────
+local function finalizeScenario()
+    cancelTimer()
+    if S.groupId then
+        local mm = ctld.MenuManager:getInstance()
+        local menu = mm and mm:getMenuByGroupId(S.groupId)
+        if menu then
+            pcall(function()
+                menu:clearBranch(MENU_PATH)
+                menu:setBranchEnabled(MENU_PATH, false)
+                menu:refresh()
+            end)
+        end
+    end
+    local total = S.passed + S.failed
+    local summary
+    if S.failed == 0 then
+        summary = TAG.." ✅ [OK] "..NAME.." — "..S.passed.."/"..total.." PASS"
+    else
+        summary = TAG.." ❌ [KO] "..NAME.." — "..S.failed.." FAIL: "..
+            table.concat(S.failReasons, " | ")
+    end
+    log(summary)
+    trigger.action.outText(summary, 360, true)
+    local ok, err = pcall(cleanup)
+    if not ok then log("WARN cleanup: "..tostring(err)) ; _SCN_EXTRACT_MENU_RUNNING = false end
+end
+
+-- ── 11. Mock menu helpers ─────────────────────────────────────────────────────
 local function newMenuMock()
     local mlog = { subMenus = {}, commands = {} }
     local mock = {
@@ -56,6 +153,7 @@ local function newMenuMock()
         end,
         clearBranch      = function() end,
         setBranchEnabled = function() end,
+        refresh          = function() end,
     }
     return mock, mlog
 end
@@ -66,19 +164,18 @@ local function hasSub(mlog, parentPath, name)
     return false
 end
 
--- Returns true if any command label under parentPath starts with prefix.
 local function hasCmdWithPrefix(mlog, parentPath, prefix)
     local pathPfx = parentPath .. "/"
     for _, c in ipairs(mlog.commands) do
         if c:sub(1, #pathPfx) == pathPfx then
             local label = c:sub(#pathPfx + 1)
-            if label:sub(1, #prefix) == prefix then return true end
+            -- Only match direct children (no "/" in the remaining label)
+            if not label:find("/", 1, true) and label:sub(1, #prefix) == prefix then return true end
         end
     end
     return false
 end
 
--- Returns count of commands whose path starts with parentPath.
 local function cmdCountUnder(mlog, parentPath)
     local pathPfx = parentPath .. "/"
     local n = 0
@@ -88,7 +185,6 @@ local function cmdCountUnder(mlog, parentPath)
     return n
 end
 
--- Fake unit / playerObj — no troops onboard (extract tests require hasTroops=false)
 local TEST_UNIT = "_em_test_unit"
 local TEST_TYPE = "_em_test_type"
 local TEST_GID  = 77777
@@ -109,18 +205,24 @@ local playerObj = {
     isTransport = true,
 }
 
--- Run refreshMenuSection with controlled nearbyGroups and no troops onboard.
 local function captureMenuRefresh(tm, nearbyGroups)
     local mockMenu, mlog = newMenuMock()
-
     local _origMMGet   = ctld.MenuManager.getInstance
     local _origIsAir   = tm._isInAir
     local _origFindAll = tm._findAllNearbyDropped
-    local _origZMGet   = CTLDZoneManager.getInstance
-    local _savedUA     = cfg.settings["unitActions"]
+    local _origZMGet      = CTLDZoneManager.getInstance
+    local _savedCaps      = cfg.settings["capabilitiesByType"]
+    local _origGetByName  = Unit.getByName
 
     ctld.MenuManager.getInstance = function(self2)
         return { getMenuByGroupId = function(self3, gid) return mockMenu end }
+    end
+    Unit.getByName = function(name)
+        if name == TEST_UNIT then
+            return { getPoint = function() return { x = 0, y = 0, z = 0 } end,
+                     getName  = function() return TEST_UNIT end }
+        end
+        return _origGetByName(name)
     end
     tm._isInAir = function(self2, unit) return false end
     tm._findAllNearbyDropped = function(self2, unit, coa)
@@ -129,54 +231,60 @@ local function captureMenuRefresh(tm, nearbyGroups)
     CTLDZoneManager.getInstance = function()
         return { getTroopZonesForCoalition = function() return {} end }
     end
-    cfg.settings["unitActions"] = { [TEST_TYPE] = { troops = true } }
+    cfg.settings["capabilitiesByType"] = { [TEST_TYPE] = { troopsEnabled = true, cratesEnabled = false, canParachuteDrop = false, canSlingload = false } }
 
-    -- No troops onboard → extract section is shown
     tm._inTransit[TEST_UNIT] = nil
 
     local ok, err = pcall(function() tm:refreshMenuSection(playerObj) end)
 
-    cfg.settings["unitActions"] = _savedUA
+    cfg.settings["capabilitiesByType"] = _savedCaps
     CTLDZoneManager.getInstance  = _origZMGet
     tm._findAllNearbyDropped     = _origFindAll
     tm._isInAir                  = _origIsAir
+    Unit.getByName               = _origGetByName
     ctld.MenuManager.getInstance = _origMMGet
 
     if not ok then error(err) end
     return mlog
 end
 
--- ── STATE MACHINE ─────────────────────────────────────────────────────────────
+-- ── 12. Step runner ───────────────────────────────────────────────────────────
+local steps = {}
+local advanceStep
 
-_G[STEP_N] = _G[STEP_N] or 1
-local step = _G[STEP_N]
-report("==== START " .. START .. " | step=" .. step .. " ====")
+advanceStep = function()
+    S.step = S.step + 1
+    if not steps[S.step] then
+        finalizeScenario()
+        return
+    end
+    local ok, err = pcall(steps[S.step])
+    if not ok then
+        fail("S"..S.step, "pcall: "..tostring(err))
+        trigger.action.outText(TAG.." ⚠️ S"..S.step.." ERREUR: "..tostring(err), 15, false)
+        advanceStep()
+    end
+end
 
-local _step_start = os.clock()
-local _result = "INCOMPLETE"
-local _ok, _err = pcall(function()
+-- ── 13. Steps ────────────────────────────────────────────────────────────────
 
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 1 — F-145 / F-146 : extract-from-field menu structure
--- ══════════════════════════════════════════════════════════════════════════════
-if step == 1 then
+-- S1 — F-145 / F-146 : extract-from-field menu structure
+steps[1] = function()
+    instruct("Step 1/1 — F-145/F-146: structure menu extract-from-field (auto)")
 
     local tm = CTLDTroopManager.getInstance()
 
-    local root     = ctld.tr("CTLD")
-    local troopSub = ctld.tr("Troop Commands")
-    local embarkSub = ctld.tr("Embark / Extract Troops")
+    local root       = ctld.tr("CTLD")
+    local troopSub   = ctld.tr("Troop Commands")
+    local embarkSub  = ctld.tr("Embark / Extract Troops")
     local extractSub = ctld.tr("Extract from field")
 
     local rootTroopEmbark = root .. "/" .. troopSub .. "/" .. embarkSub
 
-    -- ── F-145 : 1 nearby group → direct "Extract: <name>" command ────────────
+    -- F-145 : 1 nearby group → direct "Extract: <name>" command
     local nearby1 = { { groupName = "Dropped Alpha", distM = 50 } }
     local mlog1 = captureMenuRefresh(tm, nearby1)
 
-    -- Expected: a command whose label starts with "Extract:" under Embark / Extract Troops
-    local extractPrefix = ctld.tr("Extract: %1", ""):gsub("%%1", ""):gsub(" $", "")
-    -- Fallback: just look for "Extract" in the command label under embarkSub path
     local hasDirectExtract = hasCmdWithPrefix(mlog1, rootTroopEmbark, "Extract")
 
     check("F-145.1", "1 nearby group: direct Extract command exists",
@@ -184,7 +292,7 @@ if step == 1 then
     check("F-145.2", "1 nearby group: no 'Extract from field' subMenu",
         not hasSub(mlog1, rootTroopEmbark, extractSub))
 
-    -- ── F-146 : 2 nearby groups → "Extract from field" subMenu ───────────────
+    -- F-146 : 2 nearby groups → "Extract from field" subMenu
     local nearby2 = {
         { groupName = "Dropped Alpha", distM = 45 },
         { groupName = "Dropped Bravo", distM = 80 },
@@ -201,7 +309,6 @@ if step == 1 then
         cmdCountUnder(mlog2, extractSubPath) == 2,
         "count=" .. tostring(cmdCountUnder(mlog2, extractSubPath)))
 
-    -- Distance annotation: entry label should contain the distance value
     local hasAlphaDist = false
     local hasBravoDist = false
     local alphaDist = string.format("%d", math.floor(45))
@@ -217,42 +324,71 @@ if step == 1 then
             end
         end
     end
-    check("F-146.4", "entry 'Dropped Alpha' has distance annotation (45m)",
-        hasAlphaDist)
-    check("F-146.5", "entry 'Dropped Bravo' has distance annotation (80m)",
-        hasBravoDist)
+    check("F-146.4", "entry 'Dropped Alpha' has distance annotation (45m)", hasAlphaDist)
+    check("F-146.5", "entry 'Dropped Bravo' has distance annotation (80m)", hasBravoDist)
 
-    _G[STEP_N] = 99
-    _result = "step=1 SUCCESS"
-
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP FINAL
--- ══════════════════════════════════════════════════════════════════════════════
-elseif step >= 99 then
-
-    report("═══════════════════════════════════════")
-    report("EXTRACT-MENU — All steps complete (F-145→F-146)")
-    report("═══════════════════════════════════════")
-
-    _G[STEP_N] = 1
-    _result = "ALL SUCCESS"
-
-else
-    fail("step=" .. step .. " has no matching branch")
+    log("S1 done — finalisation")
+    advanceStep()
 end
 
-end)  -- end pcall
+-- ── 14. Start ────────────────────────────────────────────────────────────────
+S.transport = (function()
+    local ok, pm = pcall(CTLDPlayerManager.getInstance)
+    if ok and pm and pm._players then
+        for unitName in pairs(pm._players) do
+            local u = Unit.getByName(unitName)
+            if u and u:isExist() then return u end
+        end
+    end
+    for _, grp in ipairs(coalition.getGroups(coalition.side.BLUE) or {}) do
+        for _, unit in ipairs(grp:getUnits() or {}) do
+            if unit and unit:isExist() and unit:getPlayerName() then return unit end
+        end
+    end
+    return nil
+end)()
 
-cfg.settings["debug"] = _saved_debug
-cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+if not S.transport then
+    trigger.action.outText(TAG.." ABORT : aucun joueur BLUE. Occuper un slot avant injection.", 20)
+    cleanup()
+    return Witchcraft
+end
 
-local _ms = math.floor((os.clock() - _step_start) * 1000)
-if not _ok then
-    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
-    return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
+local pm_start = CTLDPlayerManager.getInstance()
+local playerObjStart
+if pm_start and pm_start._players then
+    for _, p in pairs(pm_start._players) do
+        if p.unitName == S.transport:getName() then
+            playerObjStart = p ; break
+        end
+    end
+    if not playerObjStart then
+        for _, p in pairs(pm_start._players) do playerObjStart = p ; break end
+    end
 end
-if _result == "ALL SUCCESS" then
-    trigger.action.outText(TAG .. " ✅ ALL SUCCESS (" .. _ms .. "ms)", 30, true)
-    return TAG .. " " .. _result .. " (" .. _ms .. "ms)"
+if not playerObjStart then
+    trigger.action.outText(TAG.." ABORT : no CTLD playerObj for transport.", 20)
+    cleanup() ; return Witchcraft
 end
-return TAG .. " " .. _result:gsub("SUCCESS", "SUCCESS (" .. _ms .. "ms)")
+
+S.groupId = playerObjStart.groupId
+
+local mm_init   = ctld.MenuManager:getInstance()
+local menu_init = mm_init and mm_init:getMenuByGroupId(S.groupId)
+if not menu_init then
+    trigger.action.outText(TAG.." ABORT : no CTLD MenuManager menu for player group.", 20)
+    cleanup() ; return Witchcraft
+end
+menu_init:addSubMenu({ ctld.tr("CTLD") }, MENU_NAME, { order = 0 })
+local _rNode = menu_init:_getNode(MENU_PATH)
+if _rNode then _rNode.order = 0 ; _rNode.enabled = true end
+menu_init:refresh()
+
+_SCN_EXTRACT_MENU_CLEANUP = cleanup
+
+log("=== START: "..NAME.." | transport="..S.transport:getName().." | groupId="..tostring(S.groupId).." | "..#steps.." steps ===")
+trigger.action.outText(TAG.." démarrage — "..#steps.." steps | "..S.transport:getName(), 8)
+advanceStep()
+
+end  -- do isolation scope
+return Witchcraft

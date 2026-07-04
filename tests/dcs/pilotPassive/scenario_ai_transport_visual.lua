@@ -1,66 +1,99 @@
 ---@diagnostic disable
 -- =============================================================================
--- scenario_ai_transport_visual.lua  [INTERACTIVE]
--- Feature N — AI transport auto-pickup visual verification
+-- live_tests/scenarios/interactive/scenario_ai_transport_visual.lua
+-- CTLD — AI transport auto-pickup visual verification
 --
 -- Spawns an AI UH-1H helicopter ("CTLD_AI_TEST") inside TRZ pickup zone pz1,
 -- adds it to transportPilotNames, and lets _checkAIStatus fire automatically
 -- (2s loop). After a few seconds, troops should appear around the helicopter.
 --
--- Protocol:
---   Step 1 — Spawn AI heli at zone pz1 center + register in transportPilotNames
---   Step 2 — (inject ~5s later) Verify hasTroops + show cargo manifest on screen
---   Step 3 — Cleanup (disembark, destroy heli, restore transportPilotNames)
+-- Cinématique (3 steps) :
+--   S1 [auto]  Spawn AI heli at zone pz1 center + register in transportPilotNames
+--   S2 [auto]  Poll hasTroops (waitFor 30s max)
+--   S3 [auto]  Cleanup (disembark, destroy heli, restore transportPilotNames)
 --
 -- Pre-requisites:
 --   - BLUE player in mission (for country ID)
 --   - TRZ zone named "pz1" configured as pickup (pickup=true), coalition BLUE
---   - CTLD fully initialised + enable_debug.lua injected
---   - allowRandomAiTeamPickups: any value (scenario works with both)
+--   - CTLD fully initialised
+--
+-- @scenario  AI-VIS
+-- @version   3.0 — 2026-06-30
+-- @coverage  F-133, F-134
 -- =============================================================================
 
--- ── Witchcraft guard ─────────────────────────────────────────────────────────
+-- ── 1. Witchcraft guard ──────────────────────────────────────────────────────
 if not ctld or not ctld.utils then
     trigger.action.outText("[AI-VIS] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
     return Witchcraft
 end
 
-local cfg = CTLDConfig.get()
-local _saved_debug = cfg.settings["debug"]
+-- ── 2. Double-injection guard ────────────────────────────────────────────────
+if _SCN_AI_VIS_RUNNING then
+    trigger.action.outText("[AI-VIS] déjà actif — attendre la fin ou redémarrer DCS.", 10)
+    return Witchcraft
+end
+_SCN_AI_VIS_RUNNING = true
+_SCN_AI_VIS_CLEANUP = nil
+
+-- ── 3. Global show callback ───────────────────────────────────────────────────
+_SCN_AI_VIS_INSTR = ""
+_SCN_AI_VIS_SHOW  = function()
+    trigger.action.outText(_SCN_AI_VIS_INSTR, 30)
+end
+
+do  -- isolation scope
+-- ── 4. Debug ON ──────────────────────────────────────────────────────────────
+local cfg                  = CTLDConfig.get()
+local _savedDebug          = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
-cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debug"]          = true
+cfg.settings["debugScreenLog"] = false
 
-local TAG    = "[AI-VIS]"
-local START  = os.date("%Y-%m-%d %H:%M:%S")
-local STEP_N = "_AI_VIS_STEP"
+-- ── 5. Constants ─────────────────────────────────────────────────────────────
+local TAG             = "[AI-VIS]"
+local NAME            = "AI transport auto-pickup visual"
+local MENU_NAME       = "Recette CTLD"
+local MENU_PATH       = { ctld.tr("CTLD"), MENU_NAME }
+local AI_UNIT_NAME    = "CTLD_AI_TEST_u1"
+local AI_GROUP_NAME   = "CTLD_AI_TEST"
+local TRZ_NAME        = "pz1"
 
-local AI_UNIT_NAME  = "CTLD_AI_TEST_u1"
-local AI_GROUP_NAME = "CTLD_AI_TEST"
-local TRZ_NAME      = "pz1"   -- pickup zone in the test mission
+-- ── 6. State ─────────────────────────────────────────────────────────────────
+local S = {
+    step        = 0,
+    passed      = 0,
+    failed      = 0,
+    failReasons = {},
+    groupId     = nil,
+    timerHandle = nil,
+    timerGen    = 0,
+    transport   = nil,
+}
 
-local function log(msg)   ctld.utils.log("INFO", TAG .. " " .. msg) end
-local function report(msg) trigger.action.outText(TAG .. " " .. msg, 30); log(msg) end
-local function pass(msg)   report("[PASS] " .. msg) end
-local function fail(msg)
-    local trace = debug.traceback(msg, 2)
-    trigger.action.outText(TAG .. " !! FAIL: " .. msg, 60)
-    log("FAIL: " .. trace)
-    error(msg)
+-- ── 7. Helpers ───────────────────────────────────────────────────────────────
+local function log(msg) ctld.utils.log("INFO", "%s %s", TAG, msg) end
+
+local function instruct(msg)
+    _SCN_AI_VIS_INSTR = TAG .. "\n" .. msg
+    log("[INSTR] " .. msg)
+    trigger.action.outText(_SCN_AI_VIS_INSTR, 360, true)
 end
+
+local function pass(id, msg) S.passed = S.passed + 1 ; log("[PASS] "..id..": "..(msg or "")) end
+local function fail(id, msg) S.failed = S.failed + 1 ; table.insert(S.failReasons, id..": "..(msg or "")) ; log("[FAIL] "..id..": "..(msg or "")) end
+
 local function check(id, desc, cond, details)
-    if cond then pass(id .. " — " .. desc)
-    else fail(id .. " — " .. desc .. (details and (" | " .. details) or "")) end
+    if cond then pass(id, desc)
+    else fail(id, desc .. (details and (" | " .. details) or "")) end
 end
 
--- ── Cleanup helper ────────────────────────────────────────────────────────────
-local function cleanup()
-    -- Restore transportPilotNames
+-- ── 8. Cleanup AI ────────────────────────────────────────────────────────────
+local function cleanupAI()
     local names = cfg.settings["transportPilotNames"] or {}
     for i = #names, 1, -1 do
         if names[i] == AI_UNIT_NAME then table.remove(names, i) end
     end
-    -- Unload troops if any remain
     local unit = Unit.getByName(AI_UNIT_NAME)
     if unit and unit:isExist() then
         local ok, tm = pcall(CTLDTroopManager.getInstance)
@@ -68,54 +101,154 @@ local function cleanup()
             tm:disembarkAll(unit)
         end
     end
-    -- Destroy AI group
     local grp = Group.getByName(AI_GROUP_NAME)
     if grp and grp:isExist() then grp:destroy() end
+    log("cleanupAI done")
+end
+
+-- ── 9. Cleanup scénario ───────────────────────────────────────────────────────
+local function cleanup()
+    if S.timerHandle then timer.removeFunction(S.timerHandle) ; S.timerHandle = nil end
+    if S.groupId then
+        local mm = ctld.MenuManager:getInstance()
+        local menu = mm and mm:getMenuByGroupId(S.groupId)
+        if menu then
+            pcall(function()
+                menu:clearBranch(MENU_PATH)
+                menu:setBranchEnabled(MENU_PATH, false)
+                menu:refresh()
+            end)
+        end
+    end
+    pcall(cleanupAI)
+    _SCN_AI_VIS_INSTR = nil ; _SCN_AI_VIS_SHOW = nil
+    cfg.settings["debug"]          = _savedDebug
+    cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+    _SCN_AI_VIS_RUNNING = false
+    _SCN_AI_VIS_CLEANUP = nil
     log("cleanup done")
 end
 
--- ── STATE MACHINE ─────────────────────────────────────────────────────────────
+-- ── 10. Timer helpers ─────────────────────────────────────────────────────────
+local function cancelTimer()
+    S.timerGen = S.timerGen + 1
+    if S.timerHandle then
+        pcall(timer.removeFunction, S.timerHandle)
+        S.timerHandle = nil
+    end
+end
 
-_G[STEP_N] = _G[STEP_N] or 1
-local step = _G[STEP_N]
-report("==== START " .. START .. " | step=" .. step .. " ====")
+local function waitFor(checkFn, intervalS, timeoutS, onSuccess, onFail)
+    cancelTimer()
+    local myGen = S.timerGen
+    local elapsed = 0
+    local function poll()
+        if S.timerGen ~= myGen then return nil end
+        elapsed = elapsed + intervalS
+        if checkFn() then
+            S.timerHandle = nil ; onSuccess()
+        elseif elapsed >= timeoutS then
+            S.timerHandle = nil ; log("[TIMEOUT] "..timeoutS.."s") ; onFail()
+        else
+            return timer.getTime() + intervalS
+        end
+    end
+    S.timerHandle = timer.scheduleFunction(poll, nil, timer.getTime() + intervalS)
+end
 
-local _step_start = os.clock()
-local _result = "INCOMPLETE"
-local _ok, _err = pcall(function()
+local function waitThen(delayS, callback)
+    cancelTimer()
+    local myGen = S.timerGen
+    S.timerHandle = timer.scheduleFunction(function()
+        if S.timerGen ~= myGen then return nil end
+        S.timerHandle = nil
+        callback()
+    end, nil, timer.getTime() + delayS)
+end
 
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 1 — Spawn AI helicopter at pz1 center, register in transportPilotNames
--- ══════════════════════════════════════════════════════════════════════════════
-if step == 1 then
+-- ── 11. Finalization ─────────────────────────────────────────────────────────
+local function finalizeScenario()
+    cancelTimer()
+    if S.groupId then
+        local mm = ctld.MenuManager:getInstance()
+        local menu = mm and mm:getMenuByGroupId(S.groupId)
+        if menu then
+            pcall(function()
+                menu:clearBranch(MENU_PATH)
+                menu:setBranchEnabled(MENU_PATH, false)
+                menu:refresh()
+            end)
+        end
+    end
+    local total = S.passed + S.failed
+    local summary
+    if S.failed == 0 then
+        summary = TAG.." ✅ [OK] "..NAME.." — "..S.passed.."/"..total.." PASS"
+    else
+        summary = TAG.." ❌ [KO] "..NAME.." — "..S.failed.." FAIL: "..
+            table.concat(S.failReasons, " | ")
+    end
+    log(summary)
+    trigger.action.outText(summary, 360, true)
+    local ok, err = pcall(cleanup)
+    if not ok then log("WARN cleanup: "..tostring(err)) ; _SCN_AI_VIS_RUNNING = false end
+end
 
-    -- Get player country (BLUE)
+-- ── 12. Step runner ───────────────────────────────────────────────────────────
+local steps = {}
+local advanceStep
+
+advanceStep = function()
+    S.step = S.step + 1
+    if not steps[S.step] then
+        finalizeScenario()
+        return
+    end
+    local ok, err = pcall(steps[S.step])
+    if not ok then
+        fail("S"..S.step, "pcall: "..tostring(err))
+        trigger.action.outText(TAG.." ⚠️ S"..S.step.." ERREUR: "..tostring(err), 15, false)
+        advanceStep()
+    end
+end
+
+-- ── 13. Steps ────────────────────────────────────────────────────────────────
+
+-- S1 — Spawn AI helicopter at pz1 center, register in transportPilotNames
+steps[1] = function()
+    instruct(
+        "Step 1/3 — SPAWN AI HELI (auto)\n"..
+        "Spawn AI UH-1H dans TRZ pz1 + enregistrement transportPilotNames.\n"..
+        "Observation sur F10 map — les troupes apparaissent autour de l'hélico."
+    )
+
     local blueUnits = coalition.getPlayers(coalition.side.BLUE) or {}
     local blueCountry = (blueUnits[1] and blueUnits[1]:isExist())
         and blueUnits[1]:getCountry()
         or country.id.USA
 
-    -- Find TRZ pz1 center
     local zm   = CTLDZoneManager.getInstance()
     local zone = zm._troopZones[TRZ_NAME]
-    if not zone then fail("TRZ zone '" .. TRZ_NAME .. "' not found") end
+    if not zone then
+        fail("AI-VIS.1.1", "TRZ zone '"..TRZ_NAME.."' non trouvée")
+        advanceStep()
+        return
+    end
 
-    local zpt = zone.center   -- {x, y, z} world coords
     check("AI-VIS.1.1", "TRZ pz1 found and active", zone.active,
         "active=" .. tostring(zone.active))
 
-    -- Destroy leftover from previous run
+    local zpt = zone.center
     local oldGrp = Group.getByName(AI_GROUP_NAME)
     if oldGrp and oldGrp:isExist() then oldGrp:destroy() end
 
-    -- Spawn AI UH-1H inside the zone (on ground, heading north)
     local grp = coalition.addGroup(blueCountry, Group.Category.HELICOPTER, {
         name       = AI_GROUP_NAME,
         task       = "Transport",
         start_time = 0,
         groupId    = math.random(87000, 87999),
         x          = zpt.x,
-        y          = zpt.z,   -- DCS addGroup uses (x,y) = (world-x, world-z)
+        y          = zpt.z,
         units = {{
             name          = AI_UNIT_NAME,
             type          = "UH-1H",
@@ -130,17 +263,14 @@ if step == 1 then
     })
     check("AI-VIS.1.2", "AI heli group spawned", grp ~= nil)
 
-    -- Register in transportPilotNames
     local names = cfg.settings["transportPilotNames"] or {}
     local already = false
     for _, n in ipairs(names) do if n == AI_UNIT_NAME then already = true; break end end
     if not already then table.insert(names, AI_UNIT_NAME) end
     cfg.settings["transportPilotNames"] = names
 
-    -- Rebuild _aiTeams so the new template list applies (in case it changed)
     CTLDCoreManager.getInstance():_initAITransports()
 
-    -- Verify the unit exists and has no player
     local aiUnit = Unit.getByName(AI_UNIT_NAME)
     check("AI-VIS.1.3", "AI unit found by name", aiUnit ~= nil)
     if aiUnit then
@@ -149,74 +279,117 @@ if step == 1 then
             "playerName=" .. tostring(aiUnit:getPlayerName()))
     end
 
-    report("⬛ AI heli spawned at " .. TRZ_NAME .. " — wait 5s then re-inject for Step 2")
-    report("⬛ Watch for troops appearing on F10 map around the helicopter")
+    log("AI heli spawné à "..TRZ_NAME.." — poll hasTroops dans 3s")
 
-    _G[STEP_N] = 2
-    _result = "step=1 SUCCESS"
+    -- S2 sera lancé automatiquement : poll toutes les 2s, timeout 30s
+    waitThen(3, function() advanceStep() end)
+end
 
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 2 — Verify troops loaded automatically by _checkAIStatus loop
--- ══════════════════════════════════════════════════════════════════════════════
-elseif step == 2 then
+-- S2 — Poll hasTroops (auto via waitFor)
+steps[2] = function()
+    instruct(
+        "Step 2/3 — VÉRIFICATION AUTO-PICKUP (auto)\n"..
+        "Attente que l'hélico AI embarque des troupes (max 30s)…\n"..
+        "Observer sur F10 map."
+    )
 
-    local ok, tm = pcall(CTLDTroopManager.getInstance)
-    if not ok then fail("CTLDTroopManager unavailable") end
-
-    local hasTr = tm:hasTroops(AI_UNIT_NAME)
-    check("AI-VIS.2.1", "AI heli has troops onboard after auto-pickup",
-        hasTr, "hasTroops=" .. tostring(hasTr))
-
-    if hasTr then
-        local list = tm:getInTransit(AI_UNIT_NAME) or {}
-        local total = 0
-        local names = {}
-        for _, grp in ipairs(list) do
-            total = total + (grp.unitTotal or 0)
-            table.insert(names, grp.templateName or "?")
+    waitFor(
+        function()
+            local ok, tm = pcall(CTLDTroopManager.getInstance)
+            return ok and tm and tm:hasTroops(AI_UNIT_NAME)
+        end,
+        2, 30,
+        function()
+            -- Succès : log le manifest
+            local ok, tm = pcall(CTLDTroopManager.getInstance)
+            if ok and tm then
+                local list  = tm:getInTransit(AI_UNIT_NAME) or {}
+                local total = 0
+                local names2 = {}
+                for _, grp in ipairs(list) do
+                    total = total + (grp.unitTotal or 0)
+                    table.insert(names2, grp.templateName or "?")
+                end
+                log("Cargo manifest: " .. total .. " soldat(s) — " .. table.concat(names2, ", "))
+            end
+            pass("AI-VIS.2.1", "hasTroops=true après auto-pickup")
+            advanceStep()
+        end,
+        function()
+            fail("AI-VIS.2.1", "timeout 30s — hasTroops toujours false")
+            log("⚠️ Vérifier CTLD.log pour _checkAIStatus / INIT-A. L'hélico est-il bien dans pz1 ?")
+            advanceStep()
         end
-        report("📦 Cargo manifest: " .. total .. " soldier(s) — groups: " .. table.concat(names, ", "))
-        report("✅ Auto-pickup confirmed — re-inject for Step 3 (cleanup)")
-    else
-        report("⚠️  No troops yet — the loop may not have fired or the heli is not in zone.")
-        report("   Check CTLD.log for INIT-A / _checkAIStatus entries.")
-        report("   If newly spawned, wait 2 more seconds and re-inject Step 2.")
+    )
+end
+
+-- S3 — Cleanup
+steps[3] = function()
+    instruct("Step 3/3 — CLEANUP (auto)")
+    pcall(cleanupAI)
+    pass("AI-VIS.3.1", "cleanup done")
+    log("AI heli détruit, transportPilotNames restauré")
+    advanceStep()
+end
+
+-- ── 14. Start ────────────────────────────────────────────────────────────────
+S.transport = (function()
+    local ok, pm = pcall(CTLDPlayerManager.getInstance)
+    if ok and pm and pm._players then
+        for unitName in pairs(pm._players) do
+            local u = Unit.getByName(unitName)
+            if u and u:isExist() then return u end
+        end
     end
+    for _, grp in ipairs(coalition.getGroups(coalition.side.BLUE) or {}) do
+        for _, unit in ipairs(grp:getUnits() or {}) do
+            if unit and unit:isExist() and unit:getPlayerName() then return unit end
+        end
+    end
+    return nil
+end)()
 
-    _G[STEP_N] = hasTr and 3 or 2   -- stay at step 2 if not loaded yet
-    _result = hasTr and "step=2 SUCCESS" or "step=2 WAITING"
-
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 3 — Cleanup
--- ══════════════════════════════════════════════════════════════════════════════
-elseif step == 3 then
-
+if not S.transport then
+    trigger.action.outText(TAG.." ABORT : aucun joueur BLUE. Occuper un slot avant injection.", 20)
     cleanup()
-
-    report("Cleanup done — AI heli destroyed, transportPilotNames restored")
-    _G[STEP_N] = 1
-    _result = "ALL SUCCESS"
-
-else
-    fail("step=" .. step .. " has no matching branch")
+    return Witchcraft
 end
 
-end)  -- end pcall
-
-cfg.settings["debug"] = _saved_debug
-cfg.settings["debugScreenLog"] = _savedDebugScreenLog
-
-local _ms = math.floor((os.clock() - _step_start) * 1000)
-if not _ok then
-    cfg.settings["debugScreenLog"] = _savedDebugScreenLog
-    -- best-effort cleanup on error
-    pcall(cleanup)
-    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
-    return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
+local pm_start = CTLDPlayerManager.getInstance()
+local playerObjStart
+if pm_start and pm_start._players then
+    for _, p in pairs(pm_start._players) do
+        if p.unitName == S.transport:getName() then
+            playerObjStart = p ; break
+        end
+    end
+    if not playerObjStart then
+        for _, p in pairs(pm_start._players) do playerObjStart = p ; break end
+    end
 end
-if _result == "ALL SUCCESS" then
-    trigger.action.outText(TAG .. " ✅ ALL SUCCESS (" .. _ms .. "ms)", 30, true)
-    return TAG .. " " .. _result .. " (" .. _ms .. "ms)"
+if not playerObjStart then
+    trigger.action.outText(TAG.." ABORT : no CTLD playerObj for transport.", 20)
+    cleanup() ; return Witchcraft
 end
-return TAG .. " " .. _result:gsub("SUCCESS", "SUCCESS (" .. _ms .. "ms)")
-        :gsub("WAITING", "WAITING (" .. _ms .. "ms)")
+
+S.groupId = playerObjStart.groupId
+
+local mm_init   = ctld.MenuManager:getInstance()
+local menu_init = mm_init and mm_init:getMenuByGroupId(S.groupId)
+if not menu_init then
+    trigger.action.outText(TAG.." ABORT : no CTLD MenuManager menu for player group.", 20)
+    cleanup() ; return Witchcraft
+end
+menu_init:addSubMenu({ ctld.tr("CTLD") }, MENU_NAME, { order = 0 })
+local _rNode = menu_init:_getNode(MENU_PATH)
+if _rNode then _rNode.order = 0 ; _rNode.enabled = true end
+menu_init:refresh()
+
+_SCN_AI_VIS_CLEANUP = cleanup
+
+log("=== START: "..NAME.." | transport="..S.transport:getName().." | groupId="..tostring(S.groupId).." | "..#steps.." steps ===")
+trigger.action.outText(TAG.." démarrage — "..#steps.." steps | "..S.transport:getName(), 8)
+advanceStep()
+
+end  -- do isolation scope
+return Witchcraft

@@ -32,18 +32,64 @@ local cfg = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debugScreenLog"] = false
 
 local TAG    = "[MT-07]"
 local START  = os.date("%Y-%m-%d %H:%M:%S")
 local STEP_N = "_MT07_STEP"
 
-local AI_UNIT = "heliai_troops"
+local AI_SRC  = "heliai_troops"      -- source late-activation dans le .miz (jamais activé)
+local AI_UNIT = "heliai_troops_run"  -- clone temporaire (spawné + détruit en cleanup)
 local AIZ_P   = "AIZ_base_B_P_5"
 local AIZ_D   = "AIZ_front_B_D"
 
 local function log(msg)    ctld.utils.log("INFO",  TAG .. " " .. msg) end
 local function report(msg) trigger.action.outText(TAG .. " " .. msg, 30); log(msg) end
+
+-- Clone helpers (ctld.utils.deepCopy retourne nil — deepCopy locale obligatoire)
+local function deepCopy(orig)
+    local copy
+    if type(orig) == "table" then
+        copy = {}
+        for k, v in pairs(orig) do copy[deepCopy(k)] = deepCopy(v) end
+        setmetatable(copy, getmetatable(orig))
+    else copy = orig end
+    return copy
+end
+
+local function findGrpInMission(name)
+    for _, cData in pairs(env.mission.coalition or {}) do
+        for _, country in ipairs(cData.country or {}) do
+            for _, cat in ipairs({"helicopter","plane","vehicle","ship"}) do
+                for _, grp in ipairs((country[cat] or {}).group or {}) do
+                    if grp.name == name then return grp, country.id end
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function spawnClone(srcName, cloneName)
+    local tmpl, ctryId = findGrpInMission(srcName)
+    if not tmpl then return nil, "not found in env.mission: " .. srcName end
+    local clone = deepCopy(tmpl)
+    clone.name            = cloneName
+    clone.units[1].name   = cloneName
+    clone.groupId         = nil
+    clone.units[1].unitId = nil
+    clone.lateActivation  = false
+    local ok, _ = pcall(coalition.addGroup, ctryId, Group.Category.HELICOPTER, clone)
+    if not ok then return nil, "coalition.addGroup failed for " .. cloneName end
+    local g = Group.getByName(cloneName)
+    if not g then return nil, "group not found after spawn: " .. cloneName end
+    return g, nil
+end
+
+local function destroyClone(cloneName)
+    local g = Group.getByName(cloneName)
+    if g and g:isExist() then pcall(function() g:destroy() end) ; log("clone destroyed: "..cloneName) end
+end
 local function pass(msg)   report("[PASS] " .. msg) end
 local function fail(msg)
     local trace = debug.traceback(msg, 2)
@@ -65,6 +111,16 @@ local function cleanup()
     if unit and unit:isExist() then
         local ok, tm = pcall(CTLDTroopManager.getInstance)
         if ok and tm and tm:hasTroops(AI_UNIT) then tm:disembarkAll(unit) end
+    end
+    destroyClone(AI_UNIT)
+    local ok3, tm3 = pcall(CTLDTroopManager.getInstance)
+    if ok3 and tm3 and tm3._droppedGroups then
+        for _, grpName in ipairs(tm3._droppedGroups[2] or {}) do
+            local tg = Group.getByName(grpName)
+            if tg and tg:isExist() then pcall(function() tg:destroy() end) end
+        end
+        tm3._droppedGroups[2] = {}
+        log("dropped troops destroyed")
     end
     log("cleanup done")
 end
@@ -107,15 +163,14 @@ if step == 1 then
     if zP then check("MT-07.1.3", "AIZ_P.isAIPickup=true",  zP.isAIPickup  == true) end
     if zD then check("MT-07.1.4", "AIZ_D.isAIDropoff=true", zD.isAIDropoff == true) end
 
-    -- Activer le groupe (late-activation dans le .miz)
-    local grp = Group.getByName(AI_UNIT)
-    if grp then grp:activate() end
+    -- Spawn clone depuis la source late-activation (répétable sans redémarrage DCS)
+    local cloneG, cloneErr = spawnClone(AI_SRC, AI_UNIT)
+    check("MT-07.1.5", "Clone '" .. AI_UNIT .. "' spawné depuis '" .. AI_SRC .. "'",
+          cloneG ~= nil, tostring(cloneErr))
 
-    -- Vérifier unité AI
     local unit = Unit.getByName(AI_UNIT)
-    check("MT-07.1.5", "Unité AI '" .. AI_UNIT .. "' présente en mission", unit ~= nil)
     if unit then
-        check("MT-07.1.6", "Unité AI sans pilote humain", unit:getPlayerName() == nil)
+        check("MT-07.1.6", "Clone sans pilote humain", unit:getPlayerName() == nil)
     end
 
     local tm = CTLDTroopManager.getInstance()

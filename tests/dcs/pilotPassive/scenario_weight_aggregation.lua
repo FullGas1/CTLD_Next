@@ -1,7 +1,7 @@
 ---@diagnostic disable
 -- =============================================================================
--- scenario_weight_aggregation.lua
--- Validates ctld.utils.updateTransportWeight aggregates all cargo sources
+-- live_tests/scenarios/interactive/scenario_weight_aggregation.lua
+-- CTLD — Validates ctld.utils.updateTransportWeight aggregates all cargo sources
 --
 -- Flow (single step, 4 sequential phases):
 --   Phase 1 — Inject troops (320 kg)                  → weight == 320
@@ -9,57 +9,168 @@
 --   Phase 3 — Disembark troops                         → weight == 2500
 --   Phase 4 — Unload crate                             → weight == 0
 --
--- Uses direct state injection (no TRZ zone / menu flow needed).
--- Tests the aggregator, not individual load/unload paths.
+-- Cinématique (1 step auto) :
+--   S1 [auto]  4 phases séquentielles, injection unique
 --
 -- Prérequis: slot BLUE UH-1H occupé.
+--
+-- @scenario  WGT
+-- @version   3.0 — 2026-06-30
+-- @coverage  F-WGT
 -- =============================================================================
 
-
--- ── Witchcraft guard ────────────────────────────────────────────────
+-- ── 1. Witchcraft guard ──────────────────────────────────────────────────────
 if not ctld or not ctld.utils then
-    trigger.action.outText("[WEIGHT] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    trigger.action.outText("[WGT] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
     return Witchcraft
 end
-local cfg = CTLDConfig.get()
-local _saved_debug = cfg.settings["debug"]
+
+-- ── 2. Double-injection guard ────────────────────────────────────────────────
+if _SCN_WGT_RUNNING then
+    trigger.action.outText("[WGT] déjà actif — attendre la fin ou redémarrer DCS.", 10)
+    return Witchcraft
+end
+_SCN_WGT_RUNNING = true
+_SCN_WGT_CLEANUP = nil
+
+-- ── 3. Global show callback ───────────────────────────────────────────────────
+_SCN_WGT_INSTR = ""
+_SCN_WGT_SHOW  = function()
+    trigger.action.outText(_SCN_WGT_INSTR, 30)
+end
+
+do  -- isolation scope
+-- ── 4. Debug ON ──────────────────────────────────────────────────────────────
+local cfg                  = CTLDConfig.get()
+local _savedDebug          = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
-cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debug"]          = true
+cfg.settings["debugScreenLog"] = false
 
-local TAG    = "[WGT]"
-local START  = os.date("%Y-%m-%d %H:%M:%S")
-local STEP_N = "_WGT_STEP"
+-- ── 5. Constants ─────────────────────────────────────────────────────────────
+local TAG             = "[WGT]"
+local NAME            = "Weight aggregation — 4 phases"
+local MENU_NAME       = "Recette CTLD"
+local MENU_PATH       = { ctld.tr("CTLD"), MENU_NAME }
+local CRATE_NAME      = "SCN_WGT_HUMMER_CRATE"
+local TROOP_W         = 320   -- 4 soldiers × 80 kg
+local CRATE_W         = 2500  -- Hummer
 
-local function log(msg)    ctld.utils.log("INFO", TAG .. " " .. msg) end
-local function report(msg) trigger.action.outText(TAG .. " " .. msg, 40); log(msg) end
-local function fail(msg)
-    local trace = debug.traceback(msg, 2)
-    trigger.action.outText(TAG .. " !! FAIL: " .. msg, 60)
-    log("FAIL: " .. trace)
-    error(msg)
+-- ── 6. State ─────────────────────────────────────────────────────────────────
+local S = {
+    step        = 0,
+    passed      = 0,
+    failed      = 0,
+    failReasons = {},
+    groupId     = nil,
+    timerHandle = nil,
+    timerGen    = 0,
+    transport   = nil,
+}
+
+-- ── 7. Helpers ───────────────────────────────────────────────────────────────
+local function log(msg) ctld.utils.log("INFO", "%s %s", TAG, msg) end
+
+local function instruct(msg)
+    _SCN_WGT_INSTR = TAG .. "\n" .. msg
+    log("[INSTR] " .. msg)
+    trigger.action.outText(_SCN_WGT_INSTR, 360, true)
 end
+
+local function pass(id, msg) S.passed = S.passed + 1 ; log("[PASS] "..id..": "..(msg or "")) end
+local function fail(id, msg) S.failed = S.failed + 1 ; table.insert(S.failReasons, id..": "..(msg or "")) ; log("[FAIL] "..id..": "..(msg or "")) end
+
 local function check(id, desc, cond, details)
-    if cond then report("[PASS] " .. id .. " — " .. desc)
-    else fail(id .. " — " .. desc .. (details and (" | " .. details) or "")) end
+    if cond then pass(id, desc)
+    else fail(id, desc .. (details and (" | " .. details) or "")) end
 end
 
--- ── Player ────────────────────────────────────────────────────────────────────
-local playerUnit = (coalition.getPlayers(coalition.side.BLUE) or {})[1]
-if not playerUnit or not playerUnit:isExist() then
-    cfg.settings["debug"] = _saved_debug
-cfg.settings["debugScreenLog"] = _savedDebugScreenLog
-    return "ABORT: no BLUE player"
+-- ── 8. Cleanup ───────────────────────────────────────────────────────────────
+local function cleanup()
+    if S.timerHandle then timer.removeFunction(S.timerHandle) ; S.timerHandle = nil end
+    if S.groupId then
+        local mm = ctld.MenuManager:getInstance()
+        local menu = mm and mm:getMenuByGroupId(S.groupId)
+        if menu then
+            pcall(function()
+                menu:clearBranch(MENU_PATH)
+                menu:setBranchEnabled(MENU_PATH, false)
+                menu:refresh()
+            end)
+        end
+    end
+    -- Nettoyage état de test
+    if S.transport then
+        local tm = CTLDTroopManager.getInstance()
+        local cm = CTLDCrateManager.getInstance()
+        if tm then tm._inTransit[S.transport:getName()] = nil end
+        if cm then cm.crates[CRATE_NAME] = nil end
+        pcall(trigger.action.setUnitInternalCargo, S.transport:getName(), 0)
+    end
+    _SCN_WGT_INSTR = nil ; _SCN_WGT_SHOW = nil
+    cfg.settings["debug"]          = _savedDebug
+    cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+    _SCN_WGT_RUNNING = false
+    _SCN_WGT_CLEANUP = nil
+    log("cleanup done")
 end
-local playerName = playerUnit:getName()
-local pPos       = playerUnit:getPoint()
 
--- ── Constants ─────────────────────────────────────────────────────────────────
-local CRATE_NAME  = "SCN_WGT_HUMMER_CRATE"
-local TROOP_W     = 320   -- 4 soldiers × 80 kg
-local CRATE_W     = 2500  -- Hummer
+-- ── 9. Timer helpers ─────────────────────────────────────────────────────────
+local function cancelTimer()
+    S.timerGen = S.timerGen + 1
+    if S.timerHandle then
+        pcall(timer.removeFunction, S.timerHandle)
+        S.timerHandle = nil
+    end
+end
 
--- ── Helper: capture the weight value written by updateTransportWeight ──────────
+-- ── 10. Finalization ─────────────────────────────────────────────────────────
+local function finalizeScenario()
+    cancelTimer()
+    if S.groupId then
+        local mm = ctld.MenuManager:getInstance()
+        local menu = mm and mm:getMenuByGroupId(S.groupId)
+        if menu then
+            pcall(function()
+                menu:clearBranch(MENU_PATH)
+                menu:setBranchEnabled(MENU_PATH, false)
+                menu:refresh()
+            end)
+        end
+    end
+    local total = S.passed + S.failed
+    local summary
+    if S.failed == 0 then
+        summary = TAG.." ✅ [OK] "..NAME.." — "..S.passed.."/"..total.." PASS"
+    else
+        summary = TAG.." ❌ [KO] "..NAME.." — "..S.failed.." FAIL: "..
+            table.concat(S.failReasons, " | ")
+    end
+    log(summary)
+    trigger.action.outText(summary, 360, true)
+    local ok, err = pcall(cleanup)
+    if not ok then log("WARN cleanup: "..tostring(err)) ; _SCN_WGT_RUNNING = false end
+end
+
+-- ── 11. Step runner ───────────────────────────────────────────────────────────
+local steps = {}
+local advanceStep
+
+advanceStep = function()
+    S.step = S.step + 1
+    if not steps[S.step] then
+        finalizeScenario()
+        return
+    end
+    local ok, err = pcall(steps[S.step])
+    if not ok then
+        fail("S"..S.step, "pcall: "..tostring(err))
+        trigger.action.outText(TAG.." ⚠️ S"..S.step.." ERREUR: "..tostring(err), 15, false)
+        advanceStep()
+    end
+end
+
+-- ── 12. Weight capture helper ─────────────────────────────────────────────────
 local function captureWeight(unitName)
     local captured = nil
     local _orig = trigger.action.setUnitInternalCargo
@@ -72,48 +183,29 @@ local function captureWeight(unitName)
     return captured or 0
 end
 
--- ── State machine ─────────────────────────────────────────────────────────────
-_G[STEP_N] = _G[STEP_N] or 1
-local step = _G[STEP_N]
-report("==== START " .. START .. " | step=" .. step .. " ====")
+-- ── 13. Steps ────────────────────────────────────────────────────────────────
 
-if step == 1 then
-    pcall(function()
-        ctld.utils.closeLog()
-        local f = io.open((cfg.settings["ctldLogPath"] or "") .. "CTLD.log", "w")
-        if f then f:write("[" .. START .. "] === LOG RESET ===\n"); f:close() end
-        ctld.utils.reopenLogAppend()
-    end)
-end
+-- S1 — All 4 phases (single injection, sequential)
+steps[1] = function()
+    instruct("Step 1/1 — F-WGT: weight aggregation 4 phases (auto)")
 
-local _step_start = os.clock()
-local _result = "INCOMPLETE"
+    local playerName = S.transport:getName()
+    local pPos       = S.transport:getPoint()
+    local tm         = CTLDTroopManager.getInstance()
+    local cm         = CTLDCrateManager.getInstance()
 
-local tm = CTLDTroopManager.getInstance()
-local cm = CTLDCrateManager.getInstance()
+    -- Cleanup stale state
+    tm._inTransit[playerName] = nil
+    cm.crates[CRATE_NAME]     = nil
 
--- Cleanup stale state from previous runs
-tm._inTransit[playerName]   = nil
-cm.crates[CRATE_NAME]       = nil
-
-local _ok, _err = pcall(function()
-
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 1 — All 4 phases (single injection, sequential)
--- ══════════════════════════════════════════════════════════════════════════════
-if step == 1 then
-
-    -- ── Phase 1 : troops only ────────────────────────────────────────────────
-    -- Inject troops directly into TroopManager state (weight only — no TRZ needed)
-    tm._inTransit[playerName] = { weight = TROOP_W }
-
+    -- Phase 1 : troops only (_inTransit is a list of {weight=...} tables)
+    tm._inTransit[playerName] = { { weight = TROOP_W } }
     local w1 = captureWeight(playerName)
-    report(string.format("Phase 1 (troops only): %d kg  [expected %d]", w1, TROOP_W))
+    log(string.format("Phase 1 (troops only): %d kg  [expected %d]", w1, TROOP_W))
     check("F-WGT.1", "troops weight = " .. TROOP_W .. " kg", w1 == TROOP_W,
         "got=" .. w1)
 
-    -- ── Phase 2 : troops + CTLD crate ────────────────────────────────────────
-    -- Inject a CTLDCrate in LOADED state (CTLD-managed: dcsStatic=nil)
+    -- Phase 2 : troops + CTLD crate
     local crate = CTLDCrate:new({
         crateName   = CRATE_NAME,
         descriptor  = { weight = CRATE_W, desc = "Hummer" },
@@ -121,62 +213,97 @@ if step == 1 then
         position    = pPos,
         coalition   = coalition.side.BLUE,
     })
-    -- crate:load() sets state=LOADED, loadedBy=transport, fromParachute=false
-    crate:load(playerUnit)
-    -- dcsStatic stays nil → isLoadedByCTLD() returns true ✅
+    crate:load(S.transport)
     cm.crates[CRATE_NAME] = crate
-
     local w2 = captureWeight(playerName)
     local expected2 = TROOP_W + CRATE_W
-    report(string.format("Phase 2 (troops+crate): %d kg  [expected %d]", w2, expected2))
+    log(string.format("Phase 2 (troops+crate): %d kg  [expected %d]", w2, expected2))
     check("F-WGT.2", "troops+crate weight = " .. expected2 .. " kg", w2 == expected2,
         "got=" .. w2)
 
-    -- ── Phase 3 : crate only (troops disembarked) ─────────────────────────────
+    -- Phase 3 : crate only (troops disembarked)
     tm._inTransit[playerName] = nil
-
     local w3 = captureWeight(playerName)
-    report(string.format("Phase 3 (crate only):   %d kg  [expected %d]", w3, CRATE_W))
+    log(string.format("Phase 3 (crate only):   %d kg  [expected %d]", w3, CRATE_W))
     check("F-WGT.3", "crate only weight = " .. CRATE_W .. " kg", w3 == CRATE_W,
         "got=" .. w3)
 
-    -- ── Phase 4 : empty (crate unloaded) ─────────────────────────────────────
-    -- Transition crate to LANDED (simulates unload, clears LOADED state)
+    -- Phase 4 : empty (crate unloaded)
     crate:unload(pPos)
-    -- isLoadedByCTLD() is now false → getLoadedCrateWeight returns 0
-
     local w4 = captureWeight(playerName)
-    report(string.format("Phase 4 (empty):          %d kg  [expected 0]", w4))
+    log(string.format("Phase 4 (empty):          %d kg  [expected 0]", w4))
     check("F-WGT.4", "empty transport weight = 0 kg", w4 == 0,
         "got=" .. w4)
 
-    -- ── Summary ───────────────────────────────────────────────────────────────
-    report(string.format(
-        "═══ WEIGHT AGGREGATION 4/4 PASS | 320→2820→2500→0 kg ═══"))
+    log("═══ WEIGHT AGGREGATION 4/4 | 320→2820→2500→0 kg ═══")
 
-    _G[STEP_N] = 1  -- single-step scenario, reset for re-run
-    _result = "ALL SUCCESS"
+    -- Cleanup state
+    tm._inTransit[playerName] = nil
+    cm.crates[CRATE_NAME]     = nil
+    pcall(trigger.action.setUnitInternalCargo, playerName, 0)
 
-else
-    fail("step=" .. step .. " has no matching branch")
+    log("S1 done — finalisation")
+    advanceStep()
 end
 
-end)  -- end pcall
+-- ── 14. Start ────────────────────────────────────────────────────────────────
+S.transport = (function()
+    local ok, pm = pcall(CTLDPlayerManager.getInstance)
+    if ok and pm and pm._players then
+        for unitName in pairs(pm._players) do
+            local u = Unit.getByName(unitName)
+            if u and u:isExist() then return u end
+        end
+    end
+    for _, grp in ipairs(coalition.getGroups(coalition.side.BLUE) or {}) do
+        for _, unit in ipairs(grp:getUnits() or {}) do
+            if unit and unit:isExist() and unit:getPlayerName() then return unit end
+        end
+    end
+    return nil
+end)()
 
--- ── Cleanup guaranteed ────────────────────────────────────────────────────────
-tm._inTransit[playerName] = nil
-cm.crates[CRATE_NAME]     = nil
--- Reset transport weight to 0 after test (best effort)
-pcall(trigger.action.setUnitInternalCargo, playerName, 0)
+if not S.transport then
+    trigger.action.outText(TAG.." ABORT : aucun joueur BLUE. Occuper un slot avant injection.", 20)
+    cleanup()
+    return Witchcraft
+end
 
-cfg.settings["debug"] = _saved_debug
-local _ms = math.floor((os.clock() - _step_start) * 1000)
-if not _ok then
-    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
-    return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
+local pm_start = CTLDPlayerManager.getInstance()
+local playerObjStart
+if pm_start and pm_start._players then
+    for _, p in pairs(pm_start._players) do
+        if p.unitName == S.transport:getName() then
+            playerObjStart = p ; break
+        end
+    end
+    if not playerObjStart then
+        for _, p in pairs(pm_start._players) do playerObjStart = p ; break end
+    end
 end
-if _result == "ALL SUCCESS" then
-    trigger.action.outText(TAG .. " ✅ ALL SUCCESS (" .. _ms .. "ms)", 30, true)
-    return TAG .. " " .. _result .. " (" .. _ms .. "ms)"
+if not playerObjStart then
+    trigger.action.outText(TAG.." ABORT : no CTLD playerObj for transport.", 20)
+    cleanup() ; return Witchcraft
 end
-return TAG .. " " .. _result:gsub("SUCCESS", "SUCCESS (" .. _ms .. "ms)")
+
+S.groupId = playerObjStart.groupId
+
+local mm_init   = ctld.MenuManager:getInstance()
+local menu_init = mm_init and mm_init:getMenuByGroupId(S.groupId)
+if not menu_init then
+    trigger.action.outText(TAG.." ABORT : no CTLD MenuManager menu for player group.", 20)
+    cleanup() ; return Witchcraft
+end
+menu_init:addSubMenu({ ctld.tr("CTLD") }, MENU_NAME, { order = 0 })
+local _rNode = menu_init:_getNode(MENU_PATH)
+if _rNode then _rNode.order = 0 ; _rNode.enabled = true end
+menu_init:refresh()
+
+_SCN_WGT_CLEANUP = cleanup
+
+log("=== START: "..NAME.." | transport="..S.transport:getName().." | groupId="..tostring(S.groupId).." | "..#steps.." steps ===")
+trigger.action.outText(TAG.." démarrage — "..#steps.." steps | "..S.transport:getName(), 8)
+advanceStep()
+
+end  -- do isolation scope
+return Witchcraft

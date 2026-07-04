@@ -1,5 +1,5 @@
 -- Core foundations (no business state)
-lib/class.lua
+core/class.lua
 CTLD_config.lua
 CTLD_i18n.lua
 CTLD_i18n_en.lua
@@ -8,9 +8,9 @@ CTLD_i18n_es.lua
 CTLD_i18n_ko.lua
 CTLD_utils.lua
 CTLD_menu.lua
-lib/CTLD_objectRegistry.lua
-lib/CTLDParachuteEffect.lua
-lib/CTLD_modValidator.lua
+core/CTLD_objectRegistry.lua
+core/CTLDParachuteEffect.lua
+core/CTLD_modValidator.lua
 -- Business domain managers
 CTLD_sceneManager.lua
 CTLD_zone.lua
@@ -33,6 +33,6 @@ scenes/CTLD_metalFarpScene.lua
 -- Orchestrator (instantiates all managers, including CTLDCrateManager._processSpawnableCrates)
 CTLD_core.lua
 -- Legacy API compatibility (after all managers)
-compat/legacy_api.lua
+legacy/legacy_api.lua
 -- User configuration (always last)
 CTLD_userConfig.lua

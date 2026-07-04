@@ -35,7 +35,7 @@ local cfg         = CTLDConfig.get()
 local _saved_dbg  = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debugScreenLog"] = false
 
 local function report(msg)
     ctld.utils.log("INFO", TAG .. " " .. msg)
@@ -190,9 +190,23 @@ elseif step == 3 then
     local _orig_remove = CTLDReconRenderer.removeIcon
     CTLDReconRenderer.removeIcon = function(mid) end
 
-    -- F-154: FARP detected via coalition.getAirbases
+    -- Mock coalition.getAirbases: mission may have no RED FARPs/helipads, so inject one
+    local pPos_154 = blueUnit:getPoint()
+    local fakeAB_154 = {
+        isExist  = function() return true end,
+        getDesc  = function() return { attributes = { Helipad = true } } end,
+        getPoint = function() return { x = pPos_154.x + 200, y = pPos_154.y, z = pPos_154.z } end,
+        getName  = function() return "red_FARP_mock" end,
+    }
+    local _orig_getAirbases = coalition.getAirbases
+    coalition.getAirbases = function(coa)
+        if coa == coalition.side.RED then return { fakeAB_154 } end
+        return _orig_getAirbases(coa)
+    end
+
+    -- F-154: FARP detected via coalition.getAirbases (mocked)
     local airbases = coalition.getAirbases(coalition.side.RED) or {}
-    check("F-154.1", "RED airbase (FARP) exists in mission", #airbases >= 1,
+    check("F-154.1", "RED airbase (FARP) mock present", #airbases >= 1,
         "count=" .. #airbases)
 
     -- F-155: FOB detected via CTLDFOBManager (requires inject_red_fob.lua)
@@ -227,6 +241,7 @@ elseif step == 3 then
     check("F-157.1", "_clearFarpMarks empties _farpMarks[player]",
         markCountAfterClear == 0, "remaining=" .. markCountAfterClear)
 
+    coalition.getAirbases        = _orig_getAirbases
     CTLDReconRenderer.createIcon = _orig_create
     CTLDReconRenderer.removeIcon = _orig_remove
 

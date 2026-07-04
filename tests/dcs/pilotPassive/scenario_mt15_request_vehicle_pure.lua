@@ -33,7 +33,7 @@ local cfg = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debugScreenLog"] = false
 
 -- ── METADATA ──────────────────────────────────────────────────────────────────
 local TAG    = "[MT-15]"

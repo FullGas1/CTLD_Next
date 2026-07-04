@@ -27,7 +27,7 @@ local cfg = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debugScreenLog"] = false
 
 local TAG    = "[FI-WPZ]"
 local START  = os.date("%Y-%m-%d %H:%M:%S")

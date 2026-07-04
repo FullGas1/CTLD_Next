@@ -592,7 +592,7 @@ function CTLDConfig:load()
         -- ["SA342Minigun"]= { cratesEnabled=false, troopsEnabled=true,  canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=3 },
         ["UH-1H"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true,  canSlingload = true,
-            canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
+            canTransportWholeVehicle = true,  useNativeDcsCargoSystem = false,
             maxTroopsOnboard = 8,   maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 1,
             maxVehicleWeight = 1360,  -- ~3000 lbs internal cargo capacity
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -611,7 +611,7 @@ function CTLDConfig:load()
         -- ["C-101EB"]  = { cratesEnabled=true, troopsEnabled=true, canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=4 },
         -- ["Su-25T"]   = { cratesEnabled=true, troopsEnabled=false, canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=1 },
         ["C-130J-30"] = {
-            cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
+            cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
             maxTroopsOnboard = 80,  maxCratesOnboard = 20,  maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
@@ -5127,7 +5127,13 @@ function ctld.utils.getSecureDistanceFromUnit(unitName)
     if not unit then return nil end
     local ok, box = pcall(function() return unit:getDesc().box end)
     if not ok or not box then return nil end
-    return math.max(math.abs(box.max.x), math.abs(box.min.x))
+    -- Use the 2-D horizontal diagonal of the bounding box so the spawn point
+    -- is guaranteed to lie outside the bbox regardless of spawn direction.
+    -- Previous code used only the X half-extent and missed the lateral (Z) extent,
+    -- causing crates to spawn inside large fixed-wing aircraft (e.g. C-130) bbox.
+    local dx = math.max(math.abs(box.max.x), math.abs(box.min.x))
+    local dz = math.max(math.abs(box.max.z), math.abs(box.min.z))
+    return math.sqrt(dx * dx + dz * dz)
 end
 
 --- Returns true if a unit is airborne.
@@ -5284,7 +5290,7 @@ end
 --   local fid = timer.scheduleFunction(myLoop, nil, timer.getTime() + 5)
 --   ctld.scheduler.register("my_loop_name", fid)
 --
--- Shutdown (inject live_tests/shutdown_ctld.lua before re-injecting CTLD_Next):
+-- Shutdown (inject tests/dcs/util/shutdown_ctld.lua before re-injecting CTLD_Next):
 --   ctld.scheduler.cancelAll()
 -- ============================================================
 
@@ -11185,12 +11191,12 @@ function CTLDCrate:isLoaded()
     return self.state == CTLDCrate.STATE.LOADED
 end
 
---- Returns true if the crate is loaded via CTLD (not DCS native).
--- DCS-native loads keep dcsStatic alive inside the aircraft.
--- CTLD-managed loads destroy the static (dcsStatic = nil).
+--- Returns true if the crate is in LOADED state (managed by CTLD).
+-- Applies to both CTLD-menu loads and DCS-native loads migrated to CTLD.
+-- Use loadedByDCSNative to further distinguish the two sub-cases.
 -- Use this to guard Drop/Parachute/Unpack CTLD menu actions.
 function CTLDCrate:isLoadedByCTLD()
-    return self.state == CTLDCrate.STATE.LOADED and self.dcsStatic == nil
+    return self.state == CTLDCrate.STATE.LOADED
 end
 
 --- Returns true if this crate can be unpacked.
@@ -12264,33 +12270,68 @@ function CTLDCrateManager:_checkNativeDCSCargo()
                             lz = dx * up.z.x + dy * up.z.y + dz * up.z.z,
                         }
                         crate:load(entry.transport)
-                        -- Migrate to CTLD-managed: destroy the DCS static so that
-                        -- isLoadedByCTLD() returns true and the full CTLD pipeline
-                        -- (parachute, drop, unpack) applies to this crate from now on.
-                        if crate.dcsStatic and crate.dcsStatic:isExist() then
-                            crate.dcsStatic:destroy()
+
+                        -- If the transport can parachute, convert this DCS-native load to
+                        -- CTLD-managed immediately (we are still on the ground / low hover,
+                        -- so UnloadCargo() is a valid ground operation that properly frees
+                        -- the DCS cargo slot).  The original static is destroyed after a
+                        -- short delay to let DCS complete the slot-release process.
+                        -- Result: the crate is fully CTLD-managed and can be parachuted
+                        -- via the CTLD menu in flight without any ghost or slot blockage.
+                        --
+                        -- If the transport cannot parachute, keep the DCS-native state so
+                        -- the player retains the DCS cargo UI (en-soute view, ground drop).
+                        local _caps = (ctld.gs("capabilitiesByType") or {})[entry.transport:getTypeName()]
+                        local _convertToCTLD = _caps and _caps.canParachuteDrop
+                        local _loadMethod
+
+                        if _convertToCTLD then
+                            -- Convert: release DCS slot (ground op), suppress drift detection,
+                            -- schedule destruction of original static after DCS processes the unload.
+                            local _origStatic = crate.dcsStatic
+                            crate.dcsStatic         = nil    -- detach from CTLD tracking now
+                            crate.loadedByDCSNative = false  -- fully CTLD-managed
+                            self._nativeCrateLink[crate.crateName] = nil  -- suppress drift
+                            pcall(function() entry.transport:UnloadCargo(_origStatic) end)
+                            timer.scheduleFunction(function()
+                                if _origStatic and _origStatic:isExist() then
+                                    _origStatic:destroy()
+                                end
+                            end, nil, timer.getTime() + 0.5)
+                            ctld.utils.updateTransportWeight(entry.unitName)
+                            _loadMethod = "ctld"
+                        else
+                            -- Keep DCS-native: slot managed by DCS, parachute not available in-flight.
+                            crate.loadedByDCSNative = true
+                            _loadMethod = "dcs_native"
                         end
-                        crate.dcsStatic        = nil
-                        crate.loadedByDCSNative = true   -- exclude from parachute: slot cannot be freed in-flight
-                        self._nativeCrateLink[crate.crateName] = nil  -- drift detection no longer needed
+
                         self:_publish("OnCrateLoaded", {
                             crate           = crate,
                             crateName       = crate.crateName,
                             carrierUnitName = entry.unitName,
                             coalition       = crate.coalition,
                             descriptor      = crate.descriptor,
-                            method          = "dcs_native",
+                            method          = _loadMethod,
                             timestamp       = timer.getAbsTime(),
                         })
                         pm:refreshForUnit(entry.unitName)
                         self:refreshUnpackSectionForUnit(entry.unitName)
                         self:refreshCrateFlightSectionForUnit(entry.unitName)
-                        ctld.utils.log("INFO",
-                            "CTLDCrateManager: DCS native LOAD (migrated to CTLD-managed) — crate=%s carrier=%s",
-                            crate.crateName, entry.unitName)
                         local _descLabel = crate.descriptor and crate.descriptor.desc or crate.crateName
-                        trigger.action.outTextForGroup(entry.playerObj.groupId,
-                            string.format("[CTLD] Crate loaded (DCS native): %s", _descLabel), 8)
+                        if _convertToCTLD then
+                            ctld.utils.log("INFO",
+                                "CTLDCrateManager: DCS native LOAD → CTLD-managed (canParachuteDrop) — crate=%s carrier=%s",
+                                crate.crateName, entry.unitName)
+                            trigger.action.outTextForGroup(entry.playerObj.groupId,
+                                string.format("[CTLD] Crate loaded (parachute-ready): %s", _descLabel), 8)
+                        else
+                            ctld.utils.log("INFO",
+                                "CTLDCrateManager: DCS native LOAD (DCS-managed, no parachute) — crate=%s carrier=%s",
+                                crate.crateName, entry.unitName)
+                            trigger.action.outTextForGroup(entry.playerObj.groupId,
+                                string.format("[CTLD] Crate loaded (DCS native): %s", _descLabel), 8)
+                        end
                         break
                     end
                 end
@@ -13211,8 +13252,7 @@ function CTLDCrateManager:parachuteCrates(transport, playerObj)
     local descentRate = ctld.gs("parachuteDescentRateCrates") or 5
     local loaded      = {}
     for _, crate in pairs(self.crates) do
-        if crate:isLoadedByCTLD() and not crate.loadedByDCSNative
-                and crate.loadedBy == transport then
+        if crate:isLoadedByCTLD() and crate.loadedBy == transport then
             table.insert(loaded, crate)
         end
     end
@@ -13229,6 +13269,14 @@ function CTLDCrateManager:parachuteCrates(transport, playerObj)
             #loaded, math.floor(estDescentTime)), 10)
 
     for _, crate in ipairs(loaded) do
+        -- Note: DCS-native crates on canParachuteDrop transports are converted to
+        -- CTLD-managed at load-detection time (loadedByDCSNative=false, dcsStatic=nil).
+        -- This guard is kept as a safety net for any residual native-loaded crate
+        -- that reaches this path, but in practice it should never fire.
+        if crate.loadedByDCSNative and crate.dcsStatic and crate.dcsStatic:isExist() then
+            crate.dcsStatic:destroy()
+            crate.dcsStatic = nil
+        end
         local landPos, descentTime = ctld.utils.calcDropPosition(transport, descentRate)
         crate:startParachute(altAGL)
         crate.estimatedLandingTime = timer.getAbsTime() + descentTime
@@ -13465,14 +13513,6 @@ function CTLDCrateManager:refreshRequestEquipmentSection(playerObj)
     local caps = (ctld.gs("capabilitiesByType") or {})[playerObj.typeName]
     if not (playerObj.isTransport and caps and caps.cratesEnabled) then return end
 
-    -- Feature Q: pre-compute loadable whole-vehicle types for this transport
-    local loadableList = nil
-    if caps.canTransportWholeVehicle then
-        loadableList = (playerObj.coalition == 1)
-            and caps.loadableVehiclesRED
-            or  caps.loadableVehiclesBLUE
-    end
-
     local mm   = ctld.MenuManager:getInstance()
     local menu = mm:getMenuByGroupId(playerObj.groupId)
     if not menu then return end
@@ -13570,13 +13610,9 @@ function CTLDCrateManager:refreshRequestEquipmentSection(playerObj)
                 local sc     = entry.singleCrate
                 local sideOk = (sc.side == nil) or (sc.side == playerObj.coalition)
                 if sideOk and (not _crateIsJTAC(sc) or jtacOk) then
-                    -- Feature Q: detect if this item should spawn a whole vehicle WAITING
+                    -- Request Equipment always spawns crates, never a whole vehicle.
+                    -- Feature Q whole-vehicle spawn is handled by the dedicated "Load Vehicle" menu.
                     local spawnAsVehicle = false
-                    if loadableList then
-                        for _, ltype in ipairs(loadableList) do
-                            if ltype == sc.unit then spawnAsVehicle = true; break end
-                        end
-                    end
                     crateOrder = crateOrder + 1
                     menu:addCommand({ root, spawnSub, lgzName, category }, sc.desc,
                         spawnFn,
@@ -13659,7 +13695,7 @@ function CTLDCrateManager:refreshCrateFlightSection(playerObj, overrideInAir)
         local onboard = 0
         if transport and transport:isExist() then
             for _, c in pairs(self.crates) do
-                if c:isLoadedByCTLD() and not c.loadedByDCSNative
+                if c:isLoadedByCTLD()
                         and not c.inTransitOnSlingload
                         and c.loadedBy
                         and c.loadedBy:getName() == playerObj.unitName then

@@ -63,7 +63,7 @@ local _saved_repack = cfg.settings["enableFARPRepack"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 
 cfg.settings["debug"]                  = true
-cfg.settings["debugScreenLog"]         = true
+cfg.settings["debugScreenLog"]         = false
 cfg.settings["debugScreenLogDuration"] = 12
 
 -- ── state machine ─────────────────────────────────────────────────────────────

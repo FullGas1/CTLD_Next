@@ -1,6 +1,6 @@
--- recette/enable_debug.lua — enable CTLD debug logging to recette/CTLD.log
+-- tests/dcs/util/enable_debug.lua — enable CTLD debug logging to tests/dcs/CTLD.log
 -- Inject via Witchcraft at the start of each recette session.
-local logDir = (ctld and ctld.path or "") .. "live_tests/"
+local logDir = "c:/Users/Moi/Documents/GitHub/CTLD_Next/tests/dcs/"
 local cfg = CTLDConfig.get()
 cfg.settings["debug"]        = true
 cfg.settings["ctldLogPath"]  = logDir

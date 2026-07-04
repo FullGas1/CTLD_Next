@@ -1,73 +1,161 @@
 ---@diagnostic disable
 -- =============================================================================
--- scenarios/interactive/scenario_p2_fob_parachute.lua
--- TODO [P] sous-cas 2 — FOB auto-unpack depuis parachutage
+-- live_tests/scenarios/interactive/scenario_p2_fob_parachute.lua
+-- CTLD — FOB auto-unpack depuis parachutage (sous-cas P2)
 --
 -- Valide :
 --   (a) checkSpatialGuards bloque si trop proche d'une LGZ existante
 --   (b) quand les guards passent : scene joue + FOB enregistré dans CTLDFOBManager
 --
--- Steps :
---   Step 1 — Spawn 3 FOB crates LANDED+fromParachute près du transport
---             + register LGZ fictive au centroïde → guard doit bloquer
---             + _checkAutoUnpack => aucune scène lancée (guard fail)
---   Step 2 — Retirer la LGZ fictive → _checkAutoUnpack => scène FOB lance
---   Step 3 (T+130) — Vérifier FOB enregistré
+-- Cinématique (3 steps, injection unique) :
+--   S1 [auto] Spawn 3 FOB crates LANDED+fromParachute + LGZ fictive → guard bloque
+--   S2 [auto] Retirer LGZ fictive → auto-unpack déclenche scène FOB
+--   S3 [auto T+130] Vérifier FOB enregistré
 --
--- Prérequis : UH-1H BLUE au sol, > 500 m de toute zone logistique existante
+-- Prérequis :
+--   - UH-1H BLUE au sol, > 500 m de toute zone logistique existante
+--   - Inject CTLD_Next.lua first, wait 3–5 s for init.
+--
+-- @scenario  P2-FOB-PARA
+-- @version   3.0 — 2026-06-30
+-- @coverage  P2.1–P2.6
 -- =============================================================================
 
--- ── Witchcraft guard ────────────────────────────────────────────────
+-- ── 1. Witchcraft guard ──────────────────────────────────────────────────────
 if not ctld or not ctld.utils then
     trigger.action.outText("[P2-FOB-PARA] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
     return Witchcraft
 end
+
+-- ── 2. Double-injection guard ────────────────────────────────────────────────
+if _SCN_P2FOBPARA_RUNNING then
+    trigger.action.outText("[P2-FOB-PARA] déjà actif — attendre la fin ou redémarrer DCS.", 10)
+    return Witchcraft
+end
+_SCN_P2FOBPARA_RUNNING = true
+_SCN_P2FOBPARA_CLEANUP = nil
+
+do  -- isolation scope
+-- ── 4. Debug ON ──────────────────────────────────────────────────────────────
+local cfg                  = CTLDConfig.get()
+local _savedDebug          = cfg.settings["debug"]
+local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
+cfg.settings["debug"]          = true
+cfg.settings["debugScreenLog"] = false
+
+-- ── 5. Constants ─────────────────────────────────────────────────────────────
 local TAG      = "[P2-FOB-PARA]"
-local STEP_VAR = "_P2_FOB_PARA_STEP"
+local NAME     = "FOB auto-unpack depuis parachutage"
 local FAKE_LGZ = "_p2_fake_lgz_"
 
-trigger.action.outText(
-    "[P2-FOB-PARA] TODO [P] sous-cas 2 : FOB parachute auto-unpack\n"
-    .. "PRE : UH-1H BLUE au sol, > 500 m de toute LGZ\n"
-    .. "RUN : step 1 => guard test + spawn crates\n"
-    .. "      step 2 => re-injecter tout de suite apres step 1\n"
-    .. "      step 3 => re-injecter a T+130",
-    30)
+-- ── 6. State ─────────────────────────────────────────────────────────────────
+local S = {
+    step        = 0,
+    passed      = 0,
+    failed      = 0,
+    failReasons = {},
+    groupId     = nil,
+    timerHandle = nil,
+    timerGen    = 0,
+    transport   = nil,
+}
 
-local function report(msg) trigger.action.outText(TAG .. " " .. msg, 40); ctld.utils.log("INFO", TAG .. " " .. msg) end
-local function pass(msg)   report("[PASS] " .. msg) end
-local function fail(msg)   report("[FAIL] " .. msg); error(msg) end
-local function check(id, desc, cond, detail)
-    if cond then pass(id .. " — " .. desc)
-    else fail(id .. " — " .. desc .. (detail and (" | " .. detail) or "")) end
+-- ── 7. Helpers ───────────────────────────────────────────────────────────────
+local function log(msg) ctld.utils.log("INFO", "%s %s", TAG, msg) end
+
+local function instruct(msg)
+    log("[INSTR] " .. msg)
+    trigger.action.outText(TAG .. "\n" .. msg, 360, true)
 end
 
-local cfg          = CTLDConfig.get()
-local _saved_debug = cfg.settings["debug"]
-local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
-cfg.settings["debug"]                  = true
-cfg.settings["debugScreenLog"]         = true
-cfg.settings["debugScreenLogDuration"] = 12
+local function pass(id, msg) S.passed = S.passed + 1 ; log("[PASS] "..id..": "..(msg or "")) end
+local function fail(id, msg) S.failed = S.failed + 1 ; table.insert(S.failReasons, id..": "..(msg or "")) ; log("[FAIL] "..id..": "..(msg or "")) end
+local function check(id, desc, cond, detail)
+    if cond then pass(id, desc)
+    else fail(id, desc .. (detail and (" | " .. detail) or "")) end
+end
 
-_G[STEP_VAR] = _G[STEP_VAR] or 1
-local step = _G[STEP_VAR]
-report("==== START " .. os.date("%H:%M:%S") .. " | step=" .. step .. " ====")
+-- ── 8. Cleanup ───────────────────────────────────────────────────────────────
+local function cleanup()
+    if S.timerHandle then timer.removeFunction(S.timerHandle) ; S.timerHandle = nil end
+    cfg.settings["debug"]          = _savedDebug
+    cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+    _SCN_P2FOBPARA_RUNNING = false
+    _SCN_P2FOBPARA_CLEANUP = nil
+    log("cleanup done")
+end
 
-local _ok, _err = pcall(function()
+-- ── 9. Timer helpers ─────────────────────────────────────────────────────────
+local function cancelTimer()
+    S.timerGen = S.timerGen + 1
+    if S.timerHandle then
+        pcall(timer.removeFunction, S.timerHandle)
+        S.timerHandle = nil
+    end
+end
 
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 1 — Guard test : LGZ fictive au centroïde → guard doit bloquer
--- ══════════════════════════════════════════════════════════════════════════════
-if step == 1 then
+local function waitThen(delayS, callback)
+    cancelTimer()
+    local myGen = S.timerGen
+    S.timerHandle = timer.scheduleFunction(function()
+        if S.timerGen ~= myGen then return nil end
+        S.timerHandle = nil
+        callback()
+    end, nil, timer.getTime() + delayS)
+end
+
+-- ── 10. Finalization ─────────────────────────────────────────────────────────
+local function finalizeScenario()
+    cancelTimer()
+    local total = S.passed + S.failed
+    local summary
+    if S.failed == 0 then
+        summary = TAG.." ✅ [OK] "..NAME.." — "..S.passed.."/"..total.." PASS"
+    else
+        summary = TAG.." ❌ [KO] "..NAME.." — "..S.failed.." FAIL: "..
+            table.concat(S.failReasons, " | ")
+    end
+    log(summary)
+    trigger.action.outText(summary, 360, true)
+    local ok, err = pcall(cleanup)
+    if not ok then log("WARN cleanup: "..tostring(err)) ; _SCN_P2FOBPARA_RUNNING = false end
+end
+
+-- ── 12. Step runner ──────────────────────────────────────────────────────────
+local steps = {}
+local advanceStep
+
+advanceStep = function()
+    S.step = S.step + 1
+    if not steps[S.step] then
+        finalizeScenario()
+        return
+    end
+    local ok, err = pcall(steps[S.step])
+    if not ok then
+        fail("S"..S.step, "pcall: "..tostring(err))
+        trigger.action.outText(TAG.." ⚠️ S"..S.step.." ERREUR: "..tostring(err), 15, false)
+        advanceStep()
+    end
+end
+
+-- ── 13. Steps ────────────────────────────────────────────────────────────────
+
+-- S1 — Spawn 3 FOB crates LANDED+fromParachute + LGZ fictive → guard doit bloquer
+steps[1] = function()
+    instruct(
+        "Step 1/3 — GUARD TEST (P2.1–P2.3)\n"..
+        "Spawn 3 crates FOB LANDED+fromParachute + LGZ fictive au centroïde.\n"..
+        "Vérification auto que le guard bloque l'auto-unpack."
+    )
 
     ctld_test.cleanup()
 
-    local transport = ctld_test.getTransport()
-    if not transport then fail("aucun joueur BLUE") end
+    if not S.transport then fail("P2.0", "aucun joueur BLUE") ; return end
 
-    local cId   = transport:getCoalition()
-    local pPos  = transport:getPoint()
-    local hdg   = ctld.utils.getHeadingInRadians("p2", transport, true)
+    local cId   = S.transport:getCoalition()
+    local pPos  = S.transport:getPoint()
+    local hdg   = ctld.utils.getHeadingInRadians("p2", S.transport, true)
 
     -- Cleanup FOBs existants
     local fobMgr = CTLDFOBManager.getInstance()
@@ -81,13 +169,12 @@ if step == 1 then
     local cm      = CTLDCrateManager.getInstance()
     local fobDesc = cm:findDescriptorByUnitType("FOB")
     check("P2.1", "FOB descriptor present", fobDesc ~= nil)
-    if not fobDesc then fail("FOB descriptor absent") end
+    if not fobDesc then fail("P2.1b", "FOB descriptor absent") ; return end
 
     -- Centroïde : 80 m devant l'hélico
     local cx = pPos.x + math.cos(hdg) * 80
     local cz = pPos.z + math.sin(hdg) * 80
     local cy = land.getHeight({ x = cx, y = cz })
-    local centroid = { x = cx, y = cy, z = cz }
 
     -- Spawn 3 FOB crates LANDED + fromParachute autour du centroïde (< 20 m)
     local spawned = 0
@@ -105,15 +192,13 @@ if step == 1 then
             spawned = spawned + 1
         end
     end
-    check("P2.2", "3 crates FOB spawnees LANDED+fromParachute", spawned == 3,
-        "spawned=" .. spawned)
+    check("P2.2", "3 crates FOB spawnées LANDED+fromParachute", spawned == 3, "spawned="..spawned)
 
     -- Enregistrer LGZ fictive AU centroïde (guard : trop proche = bloqué)
     local fakeRadius = ctld.gs("fobLogisticZoneRadius") or 150
-    CTLDZoneManager.getInstance():registerFOBAsLogistic(FAKE_LGZ, centroid, fakeRadius, cId)
-    report("LGZ fictive '" .. FAKE_LGZ .. "' enregistree au centroide")
+    CTLDZoneManager.getInstance():registerFOBAsLogistic(FAKE_LGZ, { x = cx, y = cy, z = cz }, fakeRadius, cId)
+    log("LGZ fictive '"..FAKE_LGZ.."' enregistrée au centroïde")
 
-    -- Compter les FOB avant le test
     local fobsBefore = #fobMgr:getFOBsForCoalition(cId)
 
     -- _checkAutoUnpack : doit être bloqué par la guard
@@ -127,77 +212,100 @@ if step == 1 then
     local fobsAfter = #fobMgr:getFOBsForCoalition(cId)
     check("P2.3", "guard bloque FOB auto-unpack quand LGZ trop proche",
         fobsAfter == fobsBefore,
-        "fobsBefore=" .. fobsBefore .. " fobsAfter=" .. fobsAfter)
+        "fobsBefore="..fobsBefore.." fobsAfter="..fobsAfter)
 
-    report("Step 1 OK. Re-injecter immediatement pour step 2 (retrait LGZ).")
-    _G[STEP_VAR] = 2
+    log("Step 1 OK — retrait LGZ dans 1s pour step 2")
+    waitThen(1, advanceStep)
+end
 
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 2 — Happy path : retirer la LGZ fictive → auto-unpack déclenche la scène
--- ══════════════════════════════════════════════════════════════════════════════
-elseif step == 2 then
+-- S2 — Retirer la LGZ fictive → auto-unpack déclenche scène FOB
+steps[2] = function()
+    instruct(
+        "Step 2/3 — HAPPY PATH (auto)\n"..
+        "Retrait LGZ fictive → auto-unpack déclenche scène FOB.\n"..
+        "Vérification du FOB dans 160s…"
+    )
 
-    local transport = ctld_test.getTransport()
-    local cId = transport and transport:getCoalition() or coalition.side.BLUE
+    local cId = S.transport and S.transport:getCoalition() or coalition.side.BLUE
 
     -- Retirer la LGZ fictive
     pcall(function() CTLDZoneManager.getInstance():unregisterLogistic(FAKE_LGZ) end)
-    report("LGZ fictive '" .. FAKE_LGZ .. "' retiree")
+    log("LGZ fictive '"..FAKE_LGZ.."' retirée")
 
-    local fobMgr    = CTLDFOBManager.getInstance()
-    local fobsBefore = #fobMgr:getFOBsForCoalition(cId)
-    local cm         = CTLDCrateManager.getInstance()
+    local cm = CTLDCrateManager.getInstance()
 
     -- _checkAutoUnpack : guards passent maintenant → scène FOB se lance
+    -- Temporarily clear ALL logistic zones so mission real LGZs (e.g. Batumi)
+    -- don't block the guard (test is about the fake-LGZ guard, not real mission layout)
+    local zm = CTLDZoneManager.getInstance()
+    local _savedLGZs = zm._logisticZones
+    zm._logisticZones = {}
     for _, c in pairs(cm.crates) do
         if c.fromParachute and c.descriptor and c.descriptor.unit == "FOB" then
             cm:_checkAutoUnpack(c)
             break
         end
     end
+    zm._logisticZones = _savedLGZs
 
-    -- La scène démarre de façon asynchrone (timers) — on vérifie dans 130 s
-    report("Scene FOB lancee (async). Re-injecter a T+130 pour verifier le FOB.")
-    _G[STEP_VAR] = 3
+    log("Scène FOB lancée (async). Vérification dans 160s.")
+    waitThen(160, advanceStep)
+end
 
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 3 — Vérifier FOB enregistré (~T+130)
--- ══════════════════════════════════════════════════════════════════════════════
-elseif step == 3 then
+-- S3 — Vérifier FOB enregistré (~T+130)
+steps[3] = function()
+    instruct(
+        "Step 3/3 — VÉRIFICATION FOB (auto)\n"..
+        "Vérification auto que le FOB est enregistré dans CTLDFOBManager."
+    )
 
-    local transport = ctld_test.getTransport()
-    local cId = transport and transport:getCoalition() or coalition.side.BLUE
-
+    local cId = S.transport and S.transport:getCoalition() or coalition.side.BLUE
     local fobMgr = CTLDFOBManager.getInstance()
     local fobs   = fobMgr:getFOBsForCoalition(cId)
 
-    check("P2.4", "au moins 1 FOB enregistre apres auto-unpack parachute",
-        #fobs >= 1, "count=" .. #fobs)
+    check("P2.4", "au moins 1 FOB enregistré après auto-unpack parachute",
+        #fobs >= 1, "count="..#fobs)
 
     if #fobs >= 1 then
         local fob = fobs[1]
         check("P2.5", "FOB isAlive()", fob:isAlive())
         local intPct = math.floor(fob:getIntegrityPercent() * 100 + 0.5)
-        check("P2.6", "integrity = 100%", intPct == 100, "integrity=" .. intPct .. "%")
-        report(string.format("FOB '%s' @ (%.0f, %.0f) — %d%% integrite",
+        check("P2.6", "integrity = 100%", intPct == 100, "integrity="..intPct.."%")
+        log(string.format("FOB '%s' @ (%.0f, %.0f) — %d%% intégrité",
             fob.name, fob.position.x, fob.position.z, intPct))
     end
 
-    pass("P2 COMPLETE — FOB parachute auto-unpack valide")
-    _G[STEP_VAR] = 1
-
-else
-    fail("step=" .. step .. " inconnu")
+    advanceStep()
 end
 
-end)  -- end pcall
+-- ── 14. Start ────────────────────────────────────────────────────────────────
+S.transport = (function()
+    local ok, pm = pcall(CTLDPlayerManager.getInstance)
+    if ok and pm and pm._players then
+        for unitName in pairs(pm._players) do
+            local u = Unit.getByName(unitName)
+            if u and u:isExist() then return u end
+        end
+    end
+    for _, grp in ipairs(coalition.getGroups(coalition.side.BLUE) or {}) do
+        for _, unit in ipairs(grp:getUnits() or {}) do
+            if unit and unit:isExist() and unit:getPlayerName() then return unit end
+        end
+    end
+    return nil
+end)()
 
-cfg.settings["debug"] = _saved_debug
-cfg.settings["debugScreenLog"] = _savedDebugScreenLog
-
-if not _ok then
-    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
-    return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
+if not S.transport then
+    trigger.action.outText(TAG.." ABORT : aucun joueur BLUE. Occuper un slot avant injection.", 20)
+    cleanup()
+    return Witchcraft
 end
-trigger.action.outText(TAG .. " ✅ step=" .. step .. " SUCCESS", 30, true)
-return TAG .. " step=" .. step .. " SUCCESS"
+
+_SCN_P2FOBPARA_CLEANUP = cleanup
+
+log("=== START: "..NAME.." | transport="..S.transport:getName().." | "..#steps.." steps ===")
+trigger.action.outText(TAG.." démarrage — "..#steps.." steps | "..S.transport:getName(), 8)
+advanceStep()
+
+end  -- do isolation scope
+return Witchcraft

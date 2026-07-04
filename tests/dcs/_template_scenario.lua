@@ -40,7 +40,7 @@ local cfg                  = CTLDConfig.get()
 local _savedDebug          = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"]          = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debugScreenLog"] = false   -- traces via log() only, screen = instructions only
 
 -- ── 4. Constants ─────────────────────────────────────────────────────────────
 local TAG              = "[SCN-XXX]"

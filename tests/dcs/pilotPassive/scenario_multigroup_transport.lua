@@ -1,7 +1,7 @@
 ---@diagnostic disable
 -- =============================================================================
--- scenario_multigroup_transport.lua
--- CTLDTroopManager — multi-group transport + disembark menu logic
+-- live_tests/scenarios/interactive/scenario_multigroup_transport.lua
+-- CTLD — Multi-group transport + disembark menu logic
 --
 -- Test cases:
 --   F-140 : single group onboard → "Disembark Troops" is a direct command (no subMenu)
@@ -11,47 +11,143 @@
 --   F-143 : disembarkIndex(2) disembarks group 2 first; group 1 remains
 --   F-144 : _menuCheckCargo with 2 groups → multi-line format with TOTAL line
 --
+-- Cinématique (3 steps auto) :
+--   S1 [auto]  F-140/F-141 structure menu single vs multi-group
+--   S2 [auto]  F-142/F-143 disembark operations
+--   S3 [auto]  F-144 _menuCheckCargo
+--
 -- Pre-requisites:
 --   - CTLD fully initialised (inject CTLD_Next.lua + 5s wait)
---   - recette/enable_debug.lua injected before this scenario
---   - multiGroupTransport must be true in config (or set here — handled in Step 1)
+--   - multiGroupTransport must be true in config
+--
+-- @scenario  MG-TRANSPORT
+-- @version   3.0 — 2026-06-30
+-- @coverage  F-140, F-141, F-142, F-143, F-144
 -- =============================================================================
 
-
--- ── Witchcraft guard ────────────────────────────────────────────────
+-- ── 1. Witchcraft guard ──────────────────────────────────────────────────────
 if not ctld or not ctld.utils then
-    trigger.action.outText("[MULTIGRP] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
+    trigger.action.outText("[MG-TRANSPORT] ABORT: CTLD not initialized. Inject CTLD_Next.lua first.", 15)
     return Witchcraft
 end
-local cfg = CTLDConfig.get()
-local _saved_debug = cfg.settings["debug"]
+
+-- ── 2. Double-injection guard ────────────────────────────────────────────────
+if _SCN_MG_TRANSPORT_RUNNING then
+    trigger.action.outText("[MG-TRANSPORT] déjà actif — attendre la fin ou redémarrer DCS.", 10)
+    return Witchcraft
+end
+_SCN_MG_TRANSPORT_RUNNING = true
+_SCN_MG_TRANSPORT_CLEANUP = nil
+
+-- ── 3. Global show callback ───────────────────────────────────────────────────
+_SCN_MG_TRANSPORT_INSTR = ""
+_SCN_MG_TRANSPORT_SHOW  = function()
+    trigger.action.outText(_SCN_MG_TRANSPORT_INSTR, 30)
+end
+
+do  -- isolation scope
+-- ── 4. Debug ON ──────────────────────────────────────────────────────────────
+local cfg                  = CTLDConfig.get()
+local _savedDebug          = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
-cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debug"]          = true
+cfg.settings["debugScreenLog"] = false
 
-local TAG    = "[MG-TRANSPORT]"
-local START  = os.date("%Y-%m-%d %H:%M:%S")
-local STEP_N = "_MG_TRANSPORT_STEP"
+-- ── 5. Constants ─────────────────────────────────────────────────────────────
+local TAG             = "[MG-TRANSPORT]"
+local NAME            = "Multi-group transport + disembark menu"
+local MENU_NAME       = "Recette CTLD"
+local MENU_PATH       = { ctld.tr("CTLD"), MENU_NAME }
 
-local function log(msg)    ctld.utils.log("INFO", TAG .. " " .. msg) end
-local function report(msg) trigger.action.outText(TAG .. " " .. msg, 30); log(msg) end
-local function pass(msg)   report("[PASS] " .. msg) end
-local function fail(msg)
-    local trace = debug.traceback(msg, 2)
-    trigger.action.outText(TAG .. " !! FAIL: " .. msg, 60)
-    log("FAIL: " .. trace)
-    error(msg)
+-- ── 6. State ─────────────────────────────────────────────────────────────────
+local S = {
+    step        = 0,
+    passed      = 0,
+    failed      = 0,
+    failReasons = {},
+    groupId     = nil,
+    timerHandle = nil,
+    timerGen    = 0,
+    transport   = nil,
+}
+
+-- ── 7. Helpers ───────────────────────────────────────────────────────────────
+local function log(msg) ctld.utils.log("INFO", "%s %s", TAG, msg) end
+
+local function instruct(msg)
+    _SCN_MG_TRANSPORT_INSTR = TAG .. "\n" .. msg
+    log("[INSTR] " .. msg)
+    trigger.action.outText(_SCN_MG_TRANSPORT_INSTR, 360, true)
 end
+
+local function pass(id, msg) S.passed = S.passed + 1 ; log("[PASS] "..id..": "..(msg or "")) end
+local function fail(id, msg) S.failed = S.failed + 1 ; table.insert(S.failReasons, id..": "..(msg or "")) ; log("[FAIL] "..id..": "..(msg or "")) end
+
 local function check(id, desc, cond, details)
-    if cond then pass(id .. " — " .. desc)
-    else fail(id .. " — " .. desc .. (details and (" | " .. details) or "")) end
+    if cond then pass(id, desc)
+    else fail(id, desc .. (details and (" | " .. details) or "")) end
 end
 
--- ── HELPERS ───────────────────────────────────────────────────────────────────
+-- ── 8. Cleanup ───────────────────────────────────────────────────────────────
+local function cleanup()
+    if S.timerHandle then timer.removeFunction(S.timerHandle) ; S.timerHandle = nil end
+    if S.groupId then
+        local mm = ctld.MenuManager:getInstance()
+        local menu = mm and mm:getMenuByGroupId(S.groupId)
+        if menu then
+            pcall(function()
+                menu:clearBranch(MENU_PATH)
+                menu:setBranchEnabled(MENU_PATH, false)
+                menu:refresh()
+            end)
+        end
+    end
+    _SCN_MG_TRANSPORT_INSTR = nil ; _SCN_MG_TRANSPORT_SHOW = nil
+    cfg.settings["debug"]          = _savedDebug
+    cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+    _SCN_MG_TRANSPORT_RUNNING = false
+    _SCN_MG_TRANSPORT_CLEANUP = nil
+    log("cleanup done")
+end
 
--- Build a minimal mock menu that logs addSubMenu / addCommand calls.
--- Returns (mockMenu, log) where log.subMenus and log.commands are lists of
--- "path1/path2/.../name" strings.
+-- ── 9. Timer helpers ─────────────────────────────────────────────────────────
+local function cancelTimer()
+    S.timerGen = S.timerGen + 1
+    if S.timerHandle then
+        pcall(timer.removeFunction, S.timerHandle)
+        S.timerHandle = nil
+    end
+end
+
+-- ── 10. Finalization ─────────────────────────────────────────────────────────
+local function finalizeScenario()
+    cancelTimer()
+    if S.groupId then
+        local mm = ctld.MenuManager:getInstance()
+        local menu = mm and mm:getMenuByGroupId(S.groupId)
+        if menu then
+            pcall(function()
+                menu:clearBranch(MENU_PATH)
+                menu:setBranchEnabled(MENU_PATH, false)
+                menu:refresh()
+            end)
+        end
+    end
+    local total = S.passed + S.failed
+    local summary
+    if S.failed == 0 then
+        summary = TAG.." ✅ [OK] "..NAME.." — "..S.passed.."/"..total.." PASS"
+    else
+        summary = TAG.." ❌ [KO] "..NAME.." — "..S.failed.." FAIL: "..
+            table.concat(S.failReasons, " | ")
+    end
+    log(summary)
+    trigger.action.outText(summary, 360, true)
+    local ok, err = pcall(cleanup)
+    if not ok then log("WARN cleanup: "..tostring(err)) ; _SCN_MG_TRANSPORT_RUNNING = false end
+end
+
+-- ── 11. Mock menu helpers ─────────────────────────────────────────────────────
 local function newMenuMock()
     local mlog = { subMenus = {}, commands = {} }
     local mock = {
@@ -63,6 +159,7 @@ local function newMenuMock()
         end,
         clearBranch      = function() end,
         setBranchEnabled = function() end,
+        refresh          = function() end,
     }
     return mock, mlog
 end
@@ -79,7 +176,6 @@ local function hasCmd(mlog, parentPath, label)
     return false
 end
 
--- Count commands whose path starts with parentPath (direct children only).
 local function cmdCountUnder(mlog, parentPath)
     local pathPfx = parentPath .. "/"
     local n = 0
@@ -93,7 +189,6 @@ local function fakeTG(name, count, weight)
     return { templateName = name, unitTotal = count, weight = weight }
 end
 
--- Fake unit / playerObj (purely used for getName / getGroup:getID / getPoint)
 local TEST_UNIT = "_mg_test_unit"
 local TEST_TYPE = "_mg_test_type"
 local TEST_GID  = 88888
@@ -114,20 +209,25 @@ local playerObj = {
     isTransport = true,
 }
 
--- Run refreshMenuSection with full mock isolation.
--- Returns the captured menu log.
--- nearbyGroupsOverride: optional list returned by _findAllNearbyDropped (default {})
 local function captureMenuRefresh(tm, nearbyGroupsOverride)
     local mockMenu, mlog = newMenuMock()
-
-    local _origMMGet  = ctld.MenuManager.getInstance
-    local _origIsAir  = tm._isInAir
+    local _origMMGet   = ctld.MenuManager.getInstance
+    local _origIsAir   = tm._isInAir
     local _origFindAll = tm._findAllNearbyDropped
-    local _origZMGet  = CTLDZoneManager.getInstance
-    local _savedUA    = cfg.settings["unitActions"]
+    local _origZMGet      = CTLDZoneManager.getInstance
+    local _savedCaps      = cfg.settings["capabilitiesByType"]
+    local _origGetByName  = Unit.getByName
 
     ctld.MenuManager.getInstance = function(self2)
         return { getMenuByGroupId = function(self3, gid) return mockMenu end }
+    end
+    Unit.getByName = function(name)
+        if name == TEST_UNIT then
+            return { getPoint = function() return { x = 0, y = 0, z = 0 } end,
+                     getName  = function() return TEST_UNIT end,
+                     inAir    = function() return false end }
+        end
+        return _origGetByName(name)
     end
     tm._isInAir          = function(self2, unit) return false end
     tm._findAllNearbyDropped = function(self2, unit, coa)
@@ -136,63 +236,67 @@ local function captureMenuRefresh(tm, nearbyGroupsOverride)
     CTLDZoneManager.getInstance = function()
         return { getTroopZonesForCoalition = function() return {} end }
     end
-    cfg.settings["unitActions"] = { [TEST_TYPE] = { troops = true } }
+    cfg.settings["capabilitiesByType"] = { [TEST_TYPE] = { troopsEnabled = true, cratesEnabled = false, canParachuteDrop = false, canSlingload = false } }
 
     local ok, err = pcall(function() tm:refreshMenuSection(playerObj) end)
 
-    cfg.settings["unitActions"] = _savedUA
+    cfg.settings["capabilitiesByType"] = _savedCaps
     CTLDZoneManager.getInstance  = _origZMGet
     tm._findAllNearbyDropped     = _origFindAll
     tm._isInAir                  = _origIsAir
+    Unit.getByName               = _origGetByName
     ctld.MenuManager.getInstance = _origMMGet
 
     if not ok then error(err) end
     return mlog
 end
 
--- ── STATE MACHINE ─────────────────────────────────────────────────────────────
+-- ── 12. Step runner ───────────────────────────────────────────────────────────
+local steps = {}
+local advanceStep
 
-_G[STEP_N] = _G[STEP_N] or 1
-local step = _G[STEP_N]
-report("==== START " .. START .. " | step=" .. step .. " ====")
+advanceStep = function()
+    S.step = S.step + 1
+    if not steps[S.step] then
+        finalizeScenario()
+        return
+    end
+    local ok, err = pcall(steps[S.step])
+    if not ok then
+        fail("S"..S.step, "pcall: "..tostring(err))
+        trigger.action.outText(TAG.." ⚠️ S"..S.step.." ERREUR: "..tostring(err), 15, false)
+        advanceStep()
+    end
+end
 
-local _step_start = os.clock()
-local _result = "INCOMPLETE"
-local _ok, _err = pcall(function()
+-- ── 13. Steps ────────────────────────────────────────────────────────────────
 
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 1 — F-140 / F-141 : disembark menu structure (single vs multi-group)
--- ══════════════════════════════════════════════════════════════════════════════
-if step == 1 then
+-- S1 — F-140 / F-141 : disembark menu structure (single vs multi-group)
+steps[1] = function()
+    instruct("Step 1/3 — F-140/F-141: structure menu disembark (auto)")
 
     local tm = CTLDTroopManager.getInstance()
-
-    -- Translation keys used as path components
-    local root     = ctld.tr("CTLD")
+    local root   = ctld.tr("CTLD")
     local troopSub = ctld.tr("Troop Commands")
-    local disLbl   = ctld.tr("Disembark Troops")
-    local disAll   = ctld.tr("Disembark All")
-
-    -- ── F-140 : single group → direct command, no sub-menu ───────────────────
-    tm._inTransit[TEST_UNIT] = { fakeTG("Squad Alpha", 6, 480) }
-
-    local mlog1 = captureMenuRefresh(tm)
-
+    local disLbl = ctld.tr("Disembark Troops")
+    local disAll = ctld.tr("Disembark All")
     local rootTroop = root .. "/" .. troopSub
+
+    -- F-140 : single group → direct command, no sub-menu
+    tm._inTransit[TEST_UNIT] = { fakeTG("Squad Alpha", 6, 480) }
+    local mlog1 = captureMenuRefresh(tm)
 
     check("F-140.1", "single group: no Disembark subMenu",
         not hasSub(mlog1, rootTroop, disLbl))
     check("F-140.2", "single group: direct Disembark command",
         hasCmd(mlog1, rootTroop, disLbl))
 
-    -- ── F-141 : two groups → sub-menu with All + [1] / [2] entries ───────────
+    -- F-141 : two groups → sub-menu with All + [1] / [2] entries
     tm._inTransit[TEST_UNIT] = {
         fakeTG("Squad Alpha", 6, 480),
         fakeTG("Squad Bravo", 4, 320),
     }
-
     local mlog2 = captureMenuRefresh(tm)
-
     local disSub = rootTroop .. "/" .. disLbl
 
     check("F-141.1", "two groups: Disembark subMenu exists",
@@ -203,27 +307,20 @@ if step == 1 then
         hasCmd(mlog2, disSub, "[1] Squad Alpha"))
     check("F-141.4", "two groups: [2] Squad Bravo entry",
         hasCmd(mlog2, disSub, "[2] Squad Bravo"))
-    -- Disembark subMenu must have exactly 3 commands: Disembark All + [1] + [2]
     check("F-141.5", "two groups: disembark subMenu has exactly 3 entries (All + 2 groups)",
         cmdCountUnder(mlog2, disSub) == 3,
         "count=" .. tostring(cmdCountUnder(mlog2, disSub)))
 
-    -- Cleanup
     tm._inTransit[TEST_UNIT] = nil
+    log("S1 done")
+    advanceStep()
+end
 
-    pass("Step 1 — F-140/F-141 menu structure OK. Re-inject for Step 2.")
-    _G[STEP_N] = 2
-    _result = "step=1 SUCCESS"
-
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 2 — F-142 / F-143 : disembark operations (disembarkAll / disembarkIndex)
--- ══════════════════════════════════════════════════════════════════════════════
-elseif step == 2 then
+-- S2 — F-142 / F-143 : disembark operations
+steps[2] = function()
+    instruct("Step 2/3 — F-142/F-143: disembark operations (auto)")
 
     local tm = CTLDTroopManager.getInstance()
-
-    -- Mock disembark to avoid DCS spawn — records which group was disembarked
-    -- (list[1] at call time) then removes it from _inTransit.
     local disembarkedNames = {}
     local _origDisembark   = tm.disembark
     tm.disembark = function(self2, unit)
@@ -235,30 +332,26 @@ elseif step == 2 then
         return true
     end
 
-    -- ── F-142 : disembarkAll removes all groups ───────────────────────────────
+    -- F-142 : disembarkAll removes all groups
     tm._inTransit[TEST_UNIT] = {
         fakeTG("Squad Alpha", 6, 480),
         fakeTG("Squad Bravo", 4, 320),
     }
     disembarkedNames = {}
-
     tm:disembarkAll(fakeUnit)
-
     check("F-142.1", "disembarkAll: _inTransit is nil after",
         tm._inTransit[TEST_UNIT] == nil)
     check("F-142.2", "disembarkAll: both groups disembarked (2 calls)",
         #disembarkedNames == 2,
         "calls=" .. tostring(#disembarkedNames))
 
-    -- ── F-143 : disembarkIndex(2) unloads group 2 first, group 1 remains ─────
+    -- F-143 : disembarkIndex(2) unloads group 2 first, group 1 remains
     tm._inTransit[TEST_UNIT] = {
         fakeTG("Squad Alpha", 6, 480),
         fakeTG("Squad Bravo", 4, 320),
     }
     disembarkedNames = {}
-
     tm:disembarkIndex(fakeUnit, 2)
-
     check("F-143.1", "disembarkIndex(2): group 2 disembarked first",
         disembarkedNames[1] == "Squad Bravo",
         "got=" .. tostring(disembarkedNames[1]))
@@ -270,21 +363,17 @@ elseif step == 2 then
             tm._inTransit[TEST_UNIT] and tm._inTransit[TEST_UNIT][1]
             and tm._inTransit[TEST_UNIT][1].templateName))
 
-    -- Cleanup + restore
     tm._inTransit[TEST_UNIT] = nil
     tm.disembark = _origDisembark
+    log("S2 done")
+    advanceStep()
+end
 
-    pass("Step 2 — F-142/F-143 disembark ops OK. Re-inject for Step 3.")
-    _G[STEP_N] = 3
-    _result = "step=2 SUCCESS"
-
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP 3 — F-144 : _menuCheckCargo with 2 groups → multi-line with TOTAL
--- ══════════════════════════════════════════════════════════════════════════════
-elseif step == 3 then
+-- S3 — F-144 : _menuCheckCargo with 2 groups
+steps[3] = function()
+    instruct("Step 3/3 — F-144: _menuCheckCargo multi-line (auto)")
 
     local tm = CTLDTroopManager.getInstance()
-
     tm._inTransit[TEST_UNIT] = {
         fakeTG("Squad Alpha", 6, 480),
         fakeTG("Squad Bravo", 4, 320),
@@ -293,14 +382,11 @@ elseif step == 3 then
     local capturedMsg = nil
     local _origOutText = trigger.action.outTextForGroup
     trigger.action.outTextForGroup = function(gid, msg, dur) capturedMsg = msg end
-
     tm:_menuCheckCargo(fakeUnit)
-
     trigger.action.outTextForGroup = _origOutText
     tm._inTransit[TEST_UNIT] = nil
 
-    check("F-144.1", "Check Cargo: message received",
-        capturedMsg ~= nil, "msg=nil")
+    check("F-144.1", "Check Cargo: message received", capturedMsg ~= nil, "msg=nil")
     check("F-144.2", "Check Cargo: TOTAL line present",
         capturedMsg ~= nil and capturedMsg:find("TOTAL", 1, true) ~= nil,
         "msg=" .. tostring(capturedMsg))
@@ -309,37 +395,68 @@ elseif step == 3 then
     check("F-144.4", "Check Cargo: [2] index listed",
         capturedMsg ~= nil and capturedMsg:find("[2]", 1, true) ~= nil)
 
-    _G[STEP_N] = 99
-    _result = "step=3 SUCCESS"
-
--- ══════════════════════════════════════════════════════════════════════════════
--- STEP FINAL
--- ══════════════════════════════════════════════════════════════════════════════
-elseif step >= 99 then
-
-    report("═══════════════════════════════════════")
-    report("MG-TRANSPORT — All steps complete (F-140→F-144)")
-    report("═══════════════════════════════════════")
-
-    _G[STEP_N] = 1
-    _result = "ALL SUCCESS"
-
-else
-    fail("step=" .. step .. " has no matching branch")
+    log("S3 done — finalisation")
+    advanceStep()
 end
 
-end)  -- end pcall
+-- ── 14. Start ────────────────────────────────────────────────────────────────
+S.transport = (function()
+    local ok, pm = pcall(CTLDPlayerManager.getInstance)
+    if ok and pm and pm._players then
+        for unitName in pairs(pm._players) do
+            local u = Unit.getByName(unitName)
+            if u and u:isExist() then return u end
+        end
+    end
+    for _, grp in ipairs(coalition.getGroups(coalition.side.BLUE) or {}) do
+        for _, unit in ipairs(grp:getUnits() or {}) do
+            if unit and unit:isExist() and unit:getPlayerName() then return unit end
+        end
+    end
+    return nil
+end)()
 
-cfg.settings["debug"] = _saved_debug
-cfg.settings["debugScreenLog"] = _savedDebugScreenLog
+if not S.transport then
+    trigger.action.outText(TAG.." ABORT : aucun joueur BLUE. Occuper un slot avant injection.", 20)
+    cleanup()
+    return Witchcraft
+end
 
-local _ms = math.floor((os.clock() - _step_start) * 1000)
-if not _ok then
-    trigger.action.outText(TAG .. " ❌ step=" .. step .. " FAIL", 60, true)
-    return TAG .. " step=" .. step .. " FAIL: " .. tostring(_err)
+local pm_start = CTLDPlayerManager.getInstance()
+local playerObjStart
+if pm_start and pm_start._players then
+    for _, p in pairs(pm_start._players) do
+        if p.unitName == S.transport:getName() then
+            playerObjStart = p ; break
+        end
+    end
+    if not playerObjStart then
+        for _, p in pairs(pm_start._players) do playerObjStart = p ; break end
+    end
 end
-if _result == "ALL SUCCESS" then
-    trigger.action.outText(TAG .. " ✅ ALL SUCCESS (" .. _ms .. "ms)", 30, true)
-    return TAG .. " " .. _result .. " (" .. _ms .. "ms)"
+if not playerObjStart then
+    trigger.action.outText(TAG.." ABORT : no CTLD playerObj for transport.", 20)
+    cleanup() ; return Witchcraft
 end
-return TAG .. " " .. _result:gsub("SUCCESS", "SUCCESS (" .. _ms .. "ms)")
+
+S.groupId = playerObjStart.groupId
+
+local mm_init   = ctld.MenuManager:getInstance()
+local menu_init = mm_init and mm_init:getMenuByGroupId(S.groupId)
+if not menu_init then
+    trigger.action.outText(TAG.." ABORT : no CTLD MenuManager menu for player group.", 20)
+    cleanup() ; return Witchcraft
+end
+menu_init:addSubMenu({ ctld.tr("CTLD") }, MENU_NAME, { order = 0 })
+local _rNode = menu_init:_getNode(MENU_PATH)
+if _rNode then _rNode.order = 0 ; _rNode.enabled = true end
+menu_init:refresh()
+
+_SCN_MG_TRANSPORT_CLEANUP = cleanup
+
+log("=== START: "..NAME.." | transport="..S.transport:getName().." | groupId="..tostring(S.groupId).." | "..#steps.." steps ===")
+trigger.action.outText(TAG.." démarrage — "..#steps.." steps | "..S.transport:getName(), 8)
+advanceStep()
+
+end  -- do isolation scope
+return Witchcraft

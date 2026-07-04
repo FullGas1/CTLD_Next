@@ -1,19 +1,19 @@
 ---@diagnostic disable
--- tests/helpers/loader.lua
+-- tests/ci/helpers/loader.lua
 -- Loads all src/ modules in dependency order (mirrors listToMerge.txt).
--- Call require("tests.helpers.loader") once per spec file (idempotent via _CTLD_LOADED guard).
+-- Call require("tests.ci.helpers.loader") once per spec file (idempotent via _CTLD_LOADED guard).
 -- ============================================================
 
 if _CTLD_LOADED then return end
 _CTLD_LOADED = true
 
--- Resolve repo root: two levels up from this file (tests/helpers/loader.lua).
+-- Resolve repo root: three levels up from this file (tests/ci/helpers/loader.lua).
 -- Relative source (busted invoked from repo root) → root = ""
-local _src = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]helpers[\\/]loader%.lua$")
+local _src = debug.getinfo(1, "S").source:match("^@(.+)tests[\\/]ci[\\/]helpers[\\/]loader%.lua$")
 if not _src then _src = "" end
 local SRC = _src .. "src/"
 
--- ── Silence the log file (write to OS temp dir, not live_tests/) ──
+-- ── Silence the log file (write to OS temp dir) ──
 ctld = ctld or {}
 ctld.debug  = false
 ctldLogPath = (os.getenv("TEMP") or os.getenv("TMP") or "/tmp") .. "/"

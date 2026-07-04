@@ -45,19 +45,65 @@ local cfg = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debugScreenLog"] = false
 
 local TAG    = "[MT-14]"
 local START  = os.date("%Y-%m-%d %H:%M:%S")
 local STEP_N = "_MT14_STEP"
 
-local AI_UNIT   = "heliai_mt14"
+local AI_SRC    = "heliai_mt14"      -- source late-activation dans le .miz (jamais activé)
+local AI_UNIT   = "heliai_mt14_run"  -- clone temporaire (spawné + détruit en cleanup)
 local AIZ_P     = "AIZ_mt14_B_P_V"
 local AIZ_D     = "AIZ_mt14_B_D"
 local AA_NAME   = "HAWK AA System"
 
 local function log(msg)    ctld.utils.log("INFO",  TAG .. " " .. msg) end
 local function report(msg) trigger.action.outText(TAG .. " " .. msg, 30); log(msg) end
+
+-- Clone helpers (ctld.utils.deepCopy retourne nil — deepCopy locale obligatoire)
+local function deepCopy(orig)
+    local copy
+    if type(orig) == "table" then
+        copy = {}
+        for k, v in pairs(orig) do copy[deepCopy(k)] = deepCopy(v) end
+        setmetatable(copy, getmetatable(orig))
+    else copy = orig end
+    return copy
+end
+
+local function findGrpInMission(name)
+    for _, cData in pairs(env.mission.coalition or {}) do
+        for _, country in ipairs(cData.country or {}) do
+            for _, cat in ipairs({"helicopter","plane","vehicle","ship"}) do
+                for _, grp in ipairs((country[cat] or {}).group or {}) do
+                    if grp.name == name then return grp, country.id end
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function spawnClone(srcName, cloneName)
+    local tmpl, ctryId = findGrpInMission(srcName)
+    if not tmpl then return nil, "not found in env.mission: " .. srcName end
+    local clone = deepCopy(tmpl)
+    clone.name            = cloneName
+    clone.units[1].name   = cloneName
+    clone.groupId         = nil
+    clone.units[1].unitId = nil
+    clone.lateActivation  = false
+    local ok, _ = pcall(coalition.addGroup, ctryId, Group.Category.HELICOPTER, clone)
+    if not ok then return nil, "coalition.addGroup failed for " .. cloneName end
+    local g = Group.getByName(cloneName)
+    if not g then return nil, "group not found after spawn: " .. cloneName end
+    return g, nil
+end
+
+local function destroyClone(cloneName)
+    local g = Group.getByName(cloneName)
+    if g and g:isExist() then pcall(function() g:destroy() end) ; log("clone destroyed: "..cloneName) end
+end
 local function pass(msg)   report("[PASS] " .. msg) end
 local function fail(msg)
     trigger.action.outText(TAG .. " !! FAIL: " .. msg, 60)
@@ -76,6 +122,7 @@ local function cleanup()
     end
     local cm = CTLDCoreManager.getInstance()
     if cm._aiTransportVehicle then cm._aiTransportVehicle[AI_UNIT] = nil end
+    destroyClone(AI_UNIT)
     log("cleanup done")
 end
 
@@ -148,12 +195,12 @@ if step == 1 then
         end
     end
 
-    -- Activer le groupe (late-activation dans le .miz)
-    local grp = Group.getByName(AI_UNIT)
-    if grp then grp:activate() end
+    -- Spawn clone depuis la source late-activation (répétable sans redémarrage DCS)
+    local cloneG, cloneErr = spawnClone(AI_SRC, AI_UNIT)
+    check("MT-14.1.17", "Clone '" .. AI_UNIT .. "' spawné depuis '" .. AI_SRC .. "'",
+          cloneG ~= nil, tostring(cloneErr))
 
     local unit = Unit.getByName(AI_UNIT)
-    check("MT-14.1.17", "Unité AI '" .. AI_UNIT .. "' présente en mission", unit ~= nil)
 
     local cm = CTLDCoreManager.getInstance()
     check("MT-14.1.18", "_aiTransportVehicle[" .. AI_UNIT .. "] vide initialement",

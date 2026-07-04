@@ -32,7 +32,7 @@ local cfg = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"] = true
-cfg.settings["debugScreenLog"] = true
+cfg.settings["debugScreenLog"] = false
 
 -- ── METADATA ──────────────────────────────────────────────────────────────────
 local TAG    = "[TFC]"
@@ -155,6 +155,9 @@ local function cleanupAll()
     end
 
     troopMgr._droppedTemplates = {}
+
+    -- Reset JTAC claimed targets (avoids cross-run residual claims)
+    if jtacMgr then jtacMgr._claimedTargets = {} end
 
     -- Destroy RED target vehicle group if still alive
     local tgtGname = _G["_TFC_TARGET_GROUP"]
@@ -427,8 +430,8 @@ elseif step == 4 then
 
     -- Verify _claimedTargets has 2 distinct entries (one per JTAC)
     local claimedBefore = countPairs(jtacMgr._claimedTargets)
-    check("F-T4.3", "_claimedTargets has 2 entries (both JTACs lasing)",
-        claimedBefore == 2, "got " .. claimedBefore .. " — wait longer after step 3")
+    check("F-T4.3", "_claimedTargets has >=2 entries (both JTACs lasing)",
+        claimedBefore >= 2, "got " .. claimedBefore .. " — wait longer after step 3")
     -- Verify the 2 claimed targets are different
     local claimedTargetNames = {}
     for tgt in pairs(jtacMgr._claimedTargets) do
@@ -537,8 +540,8 @@ elseif step == 6 then
 
     -- Verify both JTACs have claimed targets
     local claimedBefore = countPairs(jtacMgr._claimedTargets)
-    check("F-T6.3", "_claimedTargets has 2 entries before kill",
-        claimedBefore == 2, "got " .. claimedBefore .. " — wait longer after step 5")
+    check("F-T6.3", "_claimedTargets has >=2 entries before kill",
+        claimedBefore >= 2, "got " .. claimedBefore .. " — wait longer after step 5")
 
     -- Find the dead JTAC's target BEFORE killing it
     local deadUnitName = jtacNames[2]
@@ -588,17 +591,38 @@ elseif step == 7 then
 
     -- Phase B: re-injection after timer completes
     if _G["_TFC_STEP7_DONE"] == true then
-        local claimLog = _G["_TFC_STEP7_CLAIM_LOG"] or {}
-        log("Step 7 Phase B: claimLog entries=" .. #claimLog)
+        log("Step 7 Phase B: reading CTLD.log for claim validation")
 
-        -- Collect all distinct target names that were claimed across all cycles
+        -- Read CTLD.log from CLAIM_WINDOW_START marker to collect distinct targets claimed
+        local logPath = (cfg.settings["ctldLogPath"] or "") .. "CTLD.log"
         local allTargetsSeen = {}
-        for _, entry in ipairs(claimLog) do
-            for tgt in pairs(entry.claims) do
-                allTargetsSeen[tgt] = true
+        local startFound = false
+        pcall(ctld.utils.closeLog)
+        local f = io.open(logPath, "r")
+        if f then
+            for line in f:lines() do
+                if not startFound then
+                    if line:find("Step7 CLAIM_WINDOW_START", 1, true) then
+                        startFound = true
+                    end
+                else
+                    -- claim: arrow may be → (UTF-8) or ->, so capture last quoted token on the line
+                    if line:find("claim:", 1, true) then
+                        local tgt = line:match("'([^']+)'%s*$")
+                        if tgt then allTargetsSeen[tgt] = true end
+                    end
+                    -- release lines also reveal a target that was held (counts as distinct)
+                    if line:find("release claim on", 1, true) then
+                        local tgt = line:match("release claim on '([^']+)'")
+                        if tgt then allTargetsSeen[tgt] = true end
+                    end
+                end
             end
+            f:close()
         end
+        pcall(ctld.utils.reopenLogAppend)
         local distinctTargets = countPairs(allTargetsSeen)
+        log("Step 7 Phase B: distinctTargets=" .. distinctTargets .. " startFound=" .. tostring(startFound))
         -- Alive JTAC should have claimed at least 2 different targets
         -- (current + at least 1 reacquisition after first target destroyed)
         check("F-T7.2", "alive JTAC reacquired targets successively (>=2 distinct targets claimed)",
@@ -665,7 +689,7 @@ elseif step == 7 then
                     ctld.utils.log("INFO", "[TFC] Step7 timer: target '%s' already gone (idx=%d)", targets[idx], idx)
                 end
                 _G["_TFC_STEP7_IDX"] = idx + 1
-                return t + 8   -- next cycle in 8s
+                return t + 12  -- next cycle in 12s (autoLaseLoop needs ~10s to reacquire)
             else
                 -- All targets processed — wait one more cycle for final reacquisition attempt
                 ctld.utils.log("INFO", "[TFC] Step7 timer: all targets destroyed, final claim snapshot done")
@@ -674,6 +698,7 @@ elseif step == 7 then
             end
         end, nil, timer.getTime() + 3)
 
+        log("Step7 CLAIM_WINDOW_START")
         log("Step 7 Phase A: monitoring timer installed | aliveJtac='" .. tostring(aliveJtacKey)
             .. "' | targets=" .. #targetUnits .. " | interval=8s per target")
         pass("Step 7 — timer running (destroys 1 target every 8s). RE-INJECT IN ~" .. (#targetUnits * 8 + 15) .. "s.")

@@ -29,11 +29,40 @@
 
 ## Mission martyr — prérequis
 
+Mission DCS : **`Test_CTLDNEXT_01.miz`**
+
 La mission de test doit contenir :
 - Au moins un appareil joueur BLUE (slot occupé ou coalition)
 - Zones DCS nommées : `TRZ_alpha_B_10_nil_0`, `TRZ_beta_R_999_obj1_5`, `LGZ_base_B`
 - Un static objet de type cargo (pour F-01)
 - Un groupe nommé `jtac_test` ou contenant "jtac" (pour F-02, F-09 à F-11)
+
+---
+
+## Techniques particulières
+
+### Clone IA — scénarios pilotPassive répétables sans redémarrage DCS
+
+**Problème** : `grp:activate()` consomme définitivement l'unité late-activation de la mission. Après la première exécution, l'unité est activée → le scénario ne peut plus être rejoué sans redémarrer DCS.
+
+**Solution** : spawner un clone temporaire depuis `env.mission` + `coalition.addGroup`, nommé différemment, détruit en cleanup. La source (late-activation dans le `.miz`) reste intacte.
+
+**Règles critiques** :
+
+- `clone.lateActivation = false` — OBLIGATOIRE, sinon le clone naît inactif (invisible en mission)
+- `coalition.addGroup` retourne une `table` (pas userdata) → toujours récupérer via `Group.getByName(cloneName)` après le spawn
+- `ctld.utils.deepCopy` retourne `nil` → utiliser une deepCopy locale récursive (voir MT-10 v4.0)
+- `getInitialRoute()` n'existe pas dans l'API DCS → la route est dans `env.mission` (template)
+- Cleanup obligatoire : `destroyClone(cloneName)` + destruction des troupes déposées via `_droppedGroups[2]`
+
+**Pattern de nommage** :
+
+- Source `.miz` (jamais touchée) : `heliai_mtXX`
+- Clone temporaire : `mtXXa_run` / `mtXXb_run` (nom correspondant à `transportPilotNames`)
+
+**Contamination CTLD.log multi-runs** : les lignes FAIL des runs précédents contiennent les keywords (ex. `[FAIL] MT-10.4.2: CTLD.log contient 'AttackNearestEnemyOnLos'`). Solution : logger un marker unique (`MT10_CYCLE_A_START`) au début de chaque cycle et utiliser `scanLogAfter(marker, keyword)` qui ne lit qu'après ce marker.
+
+**Référence** : `tests/dcs/pilotPassive/scenario_mt10_ai_postspawn_task.lua` v4.0 [2026-07-01] — implémentation complète avec `spawnClone()`, `findGrpInMission()`, `deepCopy` locale, `scanLogAfter()`, cleanup clones + troupes.
 
 ---
 
@@ -409,9 +438,9 @@ Scripts multi-injections exécutés via Witchcraft en mission réelle. Chaque sc
 - **Feature T — stock par template/type AIZ (troopStock/vehicleStock tables)** : 5 fonctionnels = **58 cas** ✅ PASS (F-176 20/20 + F-177 6/6 + F-178 10/10 + F-179 11/11 + F-180 11/11 [2026-06-06]) — `parseStockTable` : isAll/init/current ; `pickMaxStock=0` gate ; `aiPickTroopTemplate` rotation : highest-stock priority, ex-aequo random, all-zero→nil, _aiTroopStock nil→legacy ; `aiConsumeTroopStock`/`aiConsumeVehicleStock` : décrément sans négatif, no-op isAll, no-op stock=-1 ; `aiRestoreTroopStock`/`aiRestoreVehicleStock` : capped at init, no-op isAll/maxS=-1/key absent ; `aiPickVehicleEntry` : nil si isAll/nil/zero, type DCS isScene=false, modèle CTLDSceneManager isScene=true, priorité stock max, stock=-1 prioritaire
 - **Feature U — AI AA system deployment (spawnSystemAt + isAASystem flag)** : 2 fonctionnels = **30 cas** ✅ PASS (F-181 19/19 + F-182 11/11 [2026-06-06]) — `getTemplateByName` : 6 templates connus + inconnu→nil + nil guard ; `aiPickVehicleEntry` isAASystem : HAWK→isAASystem=true/isScene=false, FARP Alpha→isScene=true/isAASystem=false, Hummer→DCS natif ; `spawnSystemAt` : inconnu→false, limite atteinte→false, HAWK 10 unités (3ln+2tr+2sr+1pcp+2cwar) positions cercle, OnAASystemDeployed event, _completeSystems peuplé ; **MT-14 ✅ PASS live DCS [2026-06-07]** — pickup HAWK isAASystem=true confirmé, dropoff spawnSystemAt 10 unités HAWK déployées, stock 1→0 ; bugfix spawn position (computeSafeDropPos rearSector) + i18n "loaded/unloaded/delivered" sans "vehicle"
 - **Mise en conformité scénarios recette — format v2** : ✅ 52 fichiers migrés [2026-06-30] — Witchcraft guard, \_RUNNING guard, do..end isolation, \_savedDebugScreenLog save/restore, `trigger.action.outText(summary, duration, true)` clearview sur tous les retours finaux. Template `_template_scenario.lua` v2.0 créé. Validé DCS live : FR all pass, F181 all pass, F-SC 11/11, MT-12 step=1 OK, MT-05 11/12 (1 FAIL pré-existant non lié).
-- **MT-11 — AI troop stock pickup/dropoff** : ✅ PASS live DCS [2026-06-07] — pickup troopStock template, dropoff deploy troupes
-- **MT-12 — AI vehicle native pickup/dropoff** : ✅ PASS live DCS [2026-06-07] — pickup vehicleStock Hummer, dropoff computeSafeDropPos rearSector ~42m derrière hélico ; bugfix spawn sous hélico (spawnVehicleAt→computeSafeDropPos)
-- **MT-13 — AI vehicle scene pickup/dropoff** : ✅ PASS live DCS [2026-06-07] — pickup FARP Alpha isScene=true, dropoff playScene confirmé ; ⚠️ TODO [6] position caisses scène FARP à vérifier
+- **MT-11 — AI troop stock pickup/dropoff (v4.0)** : ✅ PASS live DCS [2026-06-07] — pickup troopStock template, dropoff deploy troupes ; migré clone pattern [2026-07-01] : spawnClone(heliai_mt11→heliai_mt11_run), destroyClone+dropped troops en cleanup
+- **MT-12 — AI vehicle native pickup/dropoff (v4.0)** : ✅ PASS live DCS [2026-06-07] — pickup vehicleStock Hummer, dropoff computeSafeDropPos rearSector ~42m derrière hélico ; migré clone pattern [2026-07-01] : spawnClone(heliai_mt12→heliai_mt12_run), destroyClone en cleanup
+- **MT-13 — AI vehicle scene pickup/dropoff (v4.0)** : ✅ PASS live DCS [2026-06-07] — pickup FARP Alpha isScene=true, dropoff playScene confirmé ; migré clone pattern [2026-07-01] : spawnClone(heliai_mt13→heliai_mt13_run), destroyClone en cleanup ; ⚠️ TODO [6] position caisses scène FARP à vérifier
 - **MT-15 — Request Vehicle pur (spawn/load/unload sans crate)** : 1 scénario = **13 checks** ✅ PASS live DCS [2026-06-07] — spawnVehicleForTransport→WAITING ; findLoadableVehicles→HMMWV ; loadVehicle→LOADED (DCS unit détruite) ; findLoadedVehicles→HMMWV ; unloadVehicle→WAITING (DCS unit respawnée). Config override UH-1H canTransportWholeVehicle sauvegardée/restaurée. Visual F10 menu ✅ PASS [2026-06-07] — Request Equipment→spawn / Load Vehicle / Unload Vehicle confirmés joueur (diag_mt15_vehicle_menu_visual.lua).
 - **MT-16 — Countryside FARP scène complète (load/unload/deploy)** : ✅ PASS live DCS [2026-06-08] — crate descriptor poids=1001.24 trouvé ; crate spawnée à portée ; unpack→CTLDSceneManager:playScene("Countryside FARP") ; Invisible FARP spawné→accessible Airbase.getByName() ✅ ; étiquette (T) F10 map après délai DCS normal ✅ ; warehouse zeroed (4×0L via setLiquidAmount) ✅ ; trucks+tent(t+5.1s)+gardes+lumière+windsock+carrier shooter(20m/0°/hdg90°) présents. Layout validé [2026-06-08b].
 - **TODO [D] — Unified scene workflow** : ✅ PASS live DCS [2026-06-08] — 4 scènes (FOB/FARP Alpha/Countryside FARP/Mine Field) opérationnelles menu Request Equipment ; late injection Metal FARP via Witchcraft post-init : scene_model=true, weight_entry=w=1001.26, in_processedCrates=true ✅ ; architecture callback order-independent validée.
@@ -420,7 +449,14 @@ Scripts multi-injections exécutés via Witchcraft en mission réelle. Chaque sc
 - **TODO [P] — Recette scènes CtldScene** : 4/4 sous-cas ✅ PASS live DCS [2026-06-28] — (P1) FOB F10 step 21 → `_registerDeployedFOB` LGZ+beacon ✅ ; (P2) FOB parachute guard block (LGZ fictive) + auto-unpack → FOB enregistré ✅ ; (P3) CS FARP parachute `_checkAutoUnpack` → `playSceneAtPos` chemin generic ✅ ; (P4) Metal FARP F10 `addLiquid` warehouse (skip propre si mod absent) ✅. Scripts : `scenario_fob_scene.lua` (fixé), `scenario_p2_fob_parachute.lua`, `scenario_p3_csfarp_parachute.lua`, `scenario_p4_metal_farp.lua`.
 - **TODO [I]+[Q] — FARP Repack** : `scenario_farp_repack.lua` **12/12 PASS** live DCS [2026-06-28] — `playSceneAtPos` CS FARP démarre ✅ ; `_modelName="Countryside FARP"` dans `_active` ✅ ; `findNearbyRepackableScenes(300m)` trouve la scène ✅ ; `packScene` retire `_active[name]` ✅ ; `repackData` table retournée ✅ ; `warehouseSnapshot` nil (mod absent) → comportement attendu ✅ ; `crate.metadata.warehouseSnapshot` assigné + `liquid[0]` numérique ✅ ; `scene._params.repackData.warehouseSnapshot.liquid[0]==7777` transmis via `playSceneAtPos` ✅.
 - **warehouse_cycle — TODO[I]+[Q] cycle complet live DCS [2026-06-28]** : `scenario_warehouse_cycle.lua` **3/3 PASS** — setup enableFARPRepack + cratesRequired=1 ✅ ; crate présente + snapshot metadata ✅ ; fuel 5k/10k/15k/20k restauré sur CS_FARP-26 ✅. Bugfixes validés : `getLiquidAmount` (API correcte), menu Pack FARP conditionnel, `findPackableVehicles` guard `if uName then`, `enableFARPRepack` non restauré par cleanup scénario.
-- **Total** : **557 cas** — 1501/1501 PASS ✅ + MT-06 9/9 PASS + MT-07 4/4 PASS + MT-08 4/4 PASS + MT-09 4/4 PASS + MT-10a PASS + MT-10b PASS + MT-11 PASS + MT-12 PASS + MT-13 PASS + MT-14 PASS + MT-15 13/13 PASS + MT-16 PASS + TODO[D] PASS + Metal FARP layout PASS + Countryside FARP layout PASS [2026-06-08b] + U-106/U-107/U-108 (ModValidator) 12/12 PASS + TODO[P] 4/4 PASS [2026-06-28] + TODO[I+Q] 12/12 PASS [2026-06-28] + warehouse_cycle 3/3 PASS [2026-06-28]
+- **Bugfixes menu crates live DCS [2026-06-30]** : ✅ PASS — `scenario_crate_menu_sol_vol_visual.lua` 5/5 PASS live DCS — Pack Equipt sol uniquement (setBranchEnabled+clearBranch) ; Parachute Crates vol uniquement ; menu sol restauré après atterrissage. Fixes validés : `findPackableVehicles` (veh.spawnData.unitName) ; `_isFlying` flag onTakeoff/onLand ; `overrideInAir` param `refreshCrateFlightSection`/`refreshPackEquiptSection` ; `addSubMenu` idempotent met à jour order+enabled (`CTLD_menu.lua`) ; dead code `CTLDTroopManager:buildMenu` (missionCommands brut) supprimé.
+- **F-183/F-184/F-185 — Troop Commands menu sol/vol/sol** : ✅ PASS 5/5 live DCS [2026-06-30] — `scenario_troop_menu_sol_vol_visual.lua` — F-183 sol (Embark visible, Parachute absent) ✅ ; F-184 vol (Parachute Troops visible) ✅ ; F-185 sol restauré (Embark visible, Parachute absent) ✅.
+- **pilotPassive — scenario_unpack_jtac_drone (DRONE.1/2/V1/V2/V3/V4)** : 6/6 PASS [2026-07-01] — lifecycle MQ-9 complet : spawn crate → unpack → orbit initial → autoLase → target RED lasé → target détruit → drone retour orbit initial (795s)
+- **pilotPassive — scenario_weight_aggregation (F-WGT.1→4)** : 4 checks ✅ PASS [2026-07-01] — `ctld.utils.updateTransportWeight` agrège correctement troupes+crates+véhicules : 320→2820→2500→0 kg
+- **pilotPassive — scenario_ai_goto_wpz v3.0 (FI-WPZ)** : 6/6 PASS [2026-07-01] — `_assignPostSpawnTask(gotoNearestWPZ)` : CTLDZoneManager dispo, `getNearestWaypointZone` mock WPZ, groupe spawné, task loggée dans CTLD.log
+- **pilotPassive — scenario_ai_attack_enemy v3.0 (FI-ATK)** : 6/6 PASS [2026-07-01] — `_assignPostSpawnTask(AttackNearestEnemyOnLos)` : RED target spawné, BLUE group spawné, task loggée `AttackNearestEnemyOnLos` dans CTLD.log
+- **MT-10 — AI post-spawn task gotoNearestWPZ + AttackNearestEnemyOnLos (pilotPassive v4.0)** : 6 steps = **23/23 PASS** ✅ live DCS [2026-07-01] — spawn clones via `env.mission`+`coalition.addGroup` (`lateActivation=false`), two-phase waitFor pickup→dropoff (timeout 900s), `scanLogAfter(MARKER_A/B)` évite contamination anciens runs, cleanup détruit clones+troupes déposées ; répétable sans redémarrage mission
+- **Total** : **579 cas** — 1501/1501 PASS ✅ + MT-06 9/9 PASS + MT-07 4/4 PASS + MT-08 4/4 PASS + MT-09 4/4 PASS + MT-10 23/23 PASS (pilotPassive) + MT-11 PASS + MT-12 PASS + MT-13 PASS + MT-14 PASS + MT-15 13/13 PASS + MT-16 PASS + TODO[D] PASS + Metal FARP layout PASS + Countryside FARP layout PASS [2026-06-08b] + U-106/U-107/U-108 (ModValidator) 12/12 PASS + TODO[P] 4/4 PASS [2026-06-28] + TODO[I+Q] 12/12 PASS [2026-06-28] + warehouse_cycle 3/3 PASS [2026-06-28] + CMFV menu sol/vol/sol 5/5 PASS live DCS [2026-06-30] + TMFV Troop Commands menu sol/vol/sol 5/5 PASS live DCS [2026-06-30] + F-WGT 4/4 PASS + FI-WPZ v3.0 6/6 PASS + FI-ATK v3.0 6/6 PASS [2026-07-01]
 
 ---
 

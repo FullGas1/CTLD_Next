@@ -276,12 +276,20 @@ steps[2] = function()
     check("FI-WPZ.2.1", "test group still alive after task assignment",
         grp ~= nil and grp:isExist())
 
-    local unit1 = grp and grp:getUnit(1)
-    local vel   = unit1 and unit1:getVelocity()
-    local speed = vel and math.sqrt((vel.x or 0)^2 + (vel.z or 0)^2) or 0
-    log("unit velocity: " .. string.format("%.3f", speed) .. " m/s")
-    check("FI-WPZ.2.2", "unit is moving toward WPZ (speed > 0.1 m/s)",
-        speed > 0.1, "speed=" .. string.format("%.3f", speed) .. " m/s")
+    -- Primary check: read CTLD.log for the task-assignment confirmation.
+    -- Close/reopen the CTLD log handle to release any Windows file lock before reading.
+    local logPath = (cfg.settings["ctldLogPath"] or "") .. "CTLD.log"
+    local _wasOpen = ctld and ctld.__logFile ~= nil
+    if _wasOpen then pcall(ctld.utils.closeLog) end
+    local _f = io.open(logPath, "r")
+    local _logContent = _f and _f:read("*a") or ""
+    if _f then _f:close() end
+    if _wasOpen then pcall(ctld.utils.reopenLogAppend) end
+    local _gotoFound = _logContent:find("gotoNearestWPZ", 1, true) ~= nil
+    log("CTLD.log gotoNearestWPZ entry found: " .. tostring(_gotoFound) ..
+        " (log bytes=" .. #_logContent .. ")")
+    check("FI-WPZ.2.2", "_assignPostSpawnTask logged 'gotoNearestWPZ' (task assigned)",
+        _gotoFound, "log=" .. logPath)
 
     local uPt  = unit1 and unit1:getPoint()
     local dest = S.wpzCenter

@@ -65,7 +65,7 @@ local cfg          = CTLDConfig.get()
 local _saved_debug = cfg.settings["debug"]
 local _savedDebugScreenLog = cfg.settings["debugScreenLog"]
 cfg.settings["debug"]             = true
-cfg.settings["debugScreenLog"]    = true
+cfg.settings["debugScreenLog"]    = false
 cfg.settings["debugScreenLogDuration"] = 12
 
 -- ── state machine ─────────────────────────────────────────────────────────────
