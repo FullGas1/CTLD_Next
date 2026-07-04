@@ -547,7 +547,7 @@ function CTLDConfig:load()
         -- ["SA342Minigun"]= { cratesEnabled=false, troopsEnabled=true,  canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=3 },
         ["UH-1H"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true,  canSlingload = true,
-            canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
+            canTransportWholeVehicle = true,  useNativeDcsCargoSystem = false,
             maxTroopsOnboard = 8,   maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 1,
             maxVehicleWeight = 1360,  -- ~3000 lbs internal cargo capacity
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -566,9 +566,9 @@ function CTLDConfig:load()
         -- ["C-101EB"]  = { cratesEnabled=true, troopsEnabled=true, canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=4 },
         -- ["Su-25T"]   = { cratesEnabled=true, troopsEnabled=false, canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=1 },
         ["C-130J-30"] = {
-            cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
+            cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
-            maxTroopsOnboard = 80,  maxCratesOnboard = 20,  maxWholeVehiclesOnboard = 2,
+            maxTroopsOnboard = 80,  maxCratesOnboard = 22,  maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
             loadableVehiclesBLUE = { "M1045 HMMWV TOW", "M1043 HMMWV Armament", "Hummer" },

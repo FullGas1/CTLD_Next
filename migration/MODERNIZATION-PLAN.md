@@ -1533,6 +1533,17 @@ Suivre `tests/manual_test_sequences.md` — aucun script, observation directe.
   - `docs/dev-guide.md` §12–§19 ajoutés : Zone management, Vehicle system, Beacon, Recon, F10 Menu, Player tracking, AA System, Internal libraries [2026-06-29]
   - `README.md` : subsection Testing ajoutée avec commandes busted et pointeur vers `tests/` [2026-06-29]
 
+- ✅ **TODO-CARGO-1** [2026-07-04] : Poids correctement mis à zéro après parachutage DCS-native — confirmé via `weight_trace.lua` (intercept `setUnitInternalCargo`) : après parachutage depuis menu CTLD, `ctld.utils.updateTransportWeight` est bien appelé et émet `setUnitInternalCargo(unitName, 0)`. Résolu en conjonction avec TODO-CARGO-4 (conversion `canParachuteDrop` au moment du chargement).
+
+- ✅ **TODO-CARGO-2** [2026-07-04] : Aligné maxCratesOnboard=22 sur la capacité réelle DCS du C-130J-30 (22 caisses via UI cargo native). Correction dans CTLD_config.lua ligne C-130J-30.
+
+- ✅ **TODO-CARGO-4** [2026-07-04] : Ghost cargo DCS UI après parachutage résolu — implémentation conversion `canParachuteDrop` : au moment de la détection DCS native load (`_checkNativeDCSCargo`), si l'appareil a `canParachuteDrop=true`, la crate est immédiatement convertie en CTLD-managed (`loadedByDCSNative=false`, `dcsStatic=nil`) via `UnloadCargo()` (opération sol) + destroy différé 0.5 s. Le slot DCS est libéré proprement avant décollage. Testé et validé sur UH-1H [2026-07-04] : chargement successif de nouvelles caisses possible après parachutage.
+
+- ✅ **TODO-CARGO-3** [2026-07-04] : Faux positifs détection cargo DCS native réduits — deux correctifs implémentés :
+  1. **Filtre vitesse** (`_checkNativeDCSCargo`) : rejet de tout transport dont la vitesse dépasse 0,5 m/s (spd²>0.25) — élimine les faux positifs de taxi.
+  2. **Boucle anti-collision spawn** (`getSpawnObjectPositions`) : au spawn d’une caisse via menu CTLD, l’axe est tourné de 45° (8 essais max) jusqu’à ce qu’aucun point candidat ne soit dans la bbox d’un appareil DynamicCargo voisin — élimine les faux positifs post-spawn. Implémenté via `CTLDCrateManager:_getDynamicBBoxes()` + `_pointInBBoxLocal` dans `CTLD_utils.lua`.
+  Note : dwell-time (appareil stationnaire glissant lentement sur une caisse) non implémenté — hors scope (gain nul avec le filtre vitesse).
+
 ---
 
 ## Risks and mitigations

@@ -1904,6 +1904,20 @@ end
 
 -- ====================================================================================================
 -- SECTION: Spawn positions on a random axis (used by CTLDCrateManager and CTLDSceneManager)
+-- Local bbox containment helper (mirrors CTLDCrateManager._pointInBBox).
+-- Returns true if world point pt lies inside the bbox of a unit described by unitPos + bbox.
+local function _pointInBBoxLocal(unitPos, bbox, pt, margin)
+    margin = margin or 0
+    local dx = pt.x - unitPos.p.x
+    local dy = pt.y - unitPos.p.y
+    local dz = pt.z - unitPos.p.z
+    local lx = dx * unitPos.x.x + dy * unitPos.x.y + dz * unitPos.x.z
+    local ly = dx * unitPos.y.x + dy * unitPos.y.y + dz * unitPos.y.z
+    local lz = dx * unitPos.z.x + dy * unitPos.z.y + dz * unitPos.z.z
+    return lx >= (bbox.min.x - margin) and lx <= (bbox.max.x + margin)
+       and ly >= (bbox.min.y - margin) and ly <= (bbox.max.y + margin)
+       and lz >= (bbox.min.z - margin) and lz <= (bbox.max.z + margin)
+end
 -- Computes N absolute world positions along a single random axis (full 360° relative to unit heading).
 -- Used for:
 --   - CTLDCrateManager: pack and virtual unload (crate wave dispersion)
@@ -1921,7 +1935,13 @@ end
 -- Clock convention: 0° ahead = 12 o'clock, 90° right = 3 o'clock, 180° behind = 6 o'clock.
 -- ====================================================================================================
 
-function ctld.utils.getSpawnObjectPositions(unit, n, safeDistance, spacing, axisOffsetDeg)
+-- @param avoidBBoxes  array|nil  list of { unitPos, bbox } tables (DynamicCargo transports to avoid).
+--                                 Each entry must have the same structure as CTLDCrateManager._checkNativeDCSCargo
+--                                 transports: { unitPos = unit:getPosition(), bbox = desc.box }.
+--                                 When provided, the chosen axis is rotated by 45° increments (up to 8 tries)
+--                                 until all candidate positions are outside every listed bbox.
+--                                 Falls back to the original axis if no free slot is found after 8 tries.
+function ctld.utils.getSpawnObjectPositions(unit, n, safeDistance, spacing, axisOffsetDeg, avoidBBoxes)
     n             = n or 1
     spacing       = spacing or (ctld.gs and ctld.gs("crateSpacing")) or 5
 
@@ -1933,20 +1953,53 @@ function ctld.utils.getSpawnObjectPositions(unit, n, safeDistance, spacing, axis
         axisOffsetDeg = ctld.utils.RandomReal("getSpawnObjectPositions", 0, 360)
     end
 
-    local positions = {}
-    for i = 1, n do
-        local dist   = safeDistance + (i - 1) * spacing
-        local pt     = ctld.utils.GetRelativeVec2Coords(
-            { x = unitPos.x, y = unitPos.z },
-            unitHdg,
-            dist,
-            axisOffsetDeg
-        )
-        positions[i] = { x = pt.x, z = pt.y }
+    -- Helper: compute candidate positions for a given axis angle.
+    local function _candidates(axisDeg)
+        local pts = {}
+        for i = 1, n do
+            local dist = safeDistance + (i - 1) * spacing
+            local pt   = ctld.utils.GetRelativeVec2Coords(
+                { x = unitPos.x, y = unitPos.z },
+                unitHdg,
+                dist,
+                axisDeg
+            )
+            pts[i] = { x = pt.x, z = pt.y }
+        end
+        return pts
+    end
+
+    -- Helper: returns true if any candidate point falls inside any avoided bbox.
+    -- Uses a 2-D ground-plane check (y=0) so we don't need a full unit:getPosition() here —
+    -- the avoidBBoxes entries already carry unitPos from _checkNativeDCSCargo.
+    local function _anyCollision(pts)
+        if not avoidBBoxes or #avoidBBoxes == 0 then return false end
+        for _, avoid in ipairs(avoidBBoxes) do
+            for _, pt in ipairs(pts) do
+                local pt3 = { x = pt.x, y = avoid.unitPos.p.y, z = pt.z }
+                if _pointInBBoxLocal(avoid.unitPos, avoid.bbox, pt3, 0.5) then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local chosenAxis = axisOffsetDeg
+    local positions  = _candidates(chosenAxis)
+
+    if avoidBBoxes and #avoidBBoxes > 0 then
+        -- Rotate by 45° increments until all positions are clear (max 8 attempts = full circle).
+        for attempt = 1, 7 do
+            if not _anyCollision(positions) then break end
+            chosenAxis = (chosenAxis + 45) % 360
+            positions  = _candidates(chosenAxis)
+        end
+        -- If still colliding after 8 tries, keep last computed positions (best effort).
     end
 
     -- Clock bearing: axisOffsetDeg (0=12h, 30=1h, ..., 330=11h)
-    local clockNum = math.floor(axisOffsetDeg / 30 + 0.5) % 12
+    local clockNum = math.floor(chosenAxis / 30 + 0.5) % 12
     if clockNum == 0 then clockNum = 12 end
 
     return {
@@ -1969,7 +2022,13 @@ function ctld.utils.getSecureDistanceFromUnit(unitName)
     if not unit then return nil end
     local ok, box = pcall(function() return unit:getDesc().box end)
     if not ok or not box then return nil end
-    return math.max(math.abs(box.max.x), math.abs(box.min.x))
+    -- Use the 2-D horizontal diagonal of the bounding box so the spawn point
+    -- is guaranteed to lie outside the bbox regardless of spawn direction.
+    -- Previous code used only the X half-extent and missed the lateral (Z) extent,
+    -- causing crates to spawn inside large fixed-wing aircraft (e.g. C-130) bbox.
+    local dx = math.max(math.abs(box.max.x), math.abs(box.min.x))
+    local dz = math.max(math.abs(box.max.z), math.abs(box.min.z))
+    return math.sqrt(dx * dx + dz * dz)
 end
 
 --- Returns true if a unit is airborne.
