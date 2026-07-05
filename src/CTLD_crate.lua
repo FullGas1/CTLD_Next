@@ -335,15 +335,47 @@ function CTLDCrateManager.getInstance()
     return _cmInstance
 end
 
+--- Remove all scene crate entries from _processedCrates and _weightIndex whose models are
+-- marked _disabled by CTLDSceneManager:_auditAfterModValidator().
+-- Called once, immediately after the scene audit, before any player menu is built.
+function CTLDCrateManager:_purgeDisabledScenes()
+    local sm = CTLDSceneManager.getInstance()
+    for cat, catData in pairs(self._processedCrates) do
+        local kept = {}
+        for _, pe in ipairs(catData.singleCrates) do
+            local sc = pe.singleCrate
+            if sc then
+                local model = sm:getModel(sc.unit)
+                if model and model._disabled then
+                    -- Remove from weight index too
+                    if self._weightIndex[sc.weight] and self._weightIndex[sc.weight].unit == sc.unit then
+                        self._weightIndex[sc.weight] = nil
+                    end
+                    ctld.utils.log("WARN",
+                        "_purgeDisabledScenes: removed '%s' from Request Equipment menu (missing DCS type)",
+                        sc.unit)
+                else
+                    kept[#kept + 1] = pe
+                end
+            else
+                kept[#kept + 1] = pe
+            end
+        end
+        catData.singleCrates = kept
+    end
+end
+
 --- Inject a single scene model's crate descriptor into _weightIndex and _processedCrates.
 -- Called by _processSpawnableCrates (batch, at init) and by CTLDSceneManager:registerSceneModel
 -- (incremental, for scenes registered after CTLDCrateManager is already initialized).
 -- Weight collision resolution: if the declared weight is taken by a different unit, the next
 -- free slot in the same 1001.xx range is used and a WARN is logged.
 -- No-op if the scene is already present in _weightIndex (idempotent).
+-- No-op if the scene model is marked _disabled (missing DCS type — suppressed by audit).
 -- @param sceneName  string  model.name
 -- @param model      table   scene model with model.crate set
 function CTLDCrateManager:_injectSceneCrate(sceneName, model)
+    if model._disabled then return end  -- scene disabled by mod audit — do not add to menu
     local cd       = model.crate
     local w        = cd.weight
     local existing = self._weightIndex[w]

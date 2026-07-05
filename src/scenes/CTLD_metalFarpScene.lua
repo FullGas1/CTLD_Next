@@ -133,7 +133,8 @@ CTLDObjectRegistry.registerIfAbsent("Windsock", {
 -- ====================================================================================================
 
 local metalFarpScene = {}
-metalFarpScene.name  = "Metal FARP"
+metalFarpScene.name       = "Metal FARP"
+metalFarpScene.requiresMod = "Farp_FG_Petit_Helipad"  -- cannot be auto-validated (probeSkip); WARN emitted at init
 
 metalFarpScene.crate = {
     weight         = 1001.26,
@@ -151,6 +152,8 @@ metalFarpScene.steps = {
     -- Step 1: Farp_FG_Petit_Helipad heliport (delay=0).
     -- Spawned 50 m ahead of the trigger unit to avoid overlapping it.
     -- Saves the spawned airbase name for the warehouse-stocking step.
+    -- critical=true: if the mod is absent the helipad cannot spawn; abort the whole scene
+    -- rather than deploying trucks and a tent with no landing pad.
     -- ----------------------------------------------------------------
     {
         polar                    = { distance = 58, angle = 0 },
@@ -158,6 +161,7 @@ metalFarpScene.steps = {
         relativeHeadingInDegrees = 0,
         relativeAltitudeInMeters = 0,
         registryKey = "Farp_FG_Petit_Helipad",
+        critical    = true,
         func = function(ctx)
             if not ctx.spawnedObj then return false end
             ctx.scene._params.farpName = ctx.spawnedObj:getName()

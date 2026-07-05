@@ -451,11 +451,13 @@ function CTLDCoreManager:init()
 
     -- INIT-MOD: probe all DCS typeNames declared in config — detect missing mods
     CTLDModValidator.getInstance():run()
+    -- INIT-SCENE-AUDIT: disable scenes with missing DCS types + purge from Request Equipment menu
+    CTLDSceneManager.getInstance():_auditAfterModValidator()
 
     -- INIT-A: AI transport auto-pickup/dropoff loop
     self:_initAITransports()
 
-    ctld.utils.log("INFO", "CTLDCoreManager: init complete (INIT-A + INIT-B + INIT-C + INIT-D + INIT-E + INIT-MOD)")
+    ctld.utils.log("INFO", "CTLDCoreManager: init complete (INIT-A + INIT-B + INIT-C + INIT-D + INIT-E + INIT-MOD + INIT-SCENE-AUDIT)")
 end
 
 -- INIT-B -----------------------------------------------------------
