@@ -1243,6 +1243,7 @@ Minor cleanups identified — low priority, no functional impact.
   Recette F-181 (19/19 PASS) + F-182 (11/11 PASS) [2026-06-06].
   **MT-14 ✅ PASS live DCS [2026-06-07]** — pickup HAWK isAASystem=true, dropoff spawnSystemAt 10 unités, stock 1→0 ; bugfix `computeSafeDropPos` rearSector + i18n "loaded/unloaded/delivered" sans "vehicle".
   **TODO [6] ✅ [2026-06-07]** — FARP Alpha scene : Cargo06 + ammo_cargo×2 pivotés à 90° (orientation correcte) + repositionnés (d+3m extérieur, angle+1.2° droite pour Cargo06).
+  **MT-13 ✅ PASS live DCS [2026-07-05]** — layout FARP Alpha validé visuellement (spawn depuis UH-1H via `spawn_farp_alpha_uh1h.lua`) : Cargo06+ammo_cargo×2 orientations 90°/95° confirmées, windsock 80m/10°, tente 130m/5°, trucks 110-125m/15°. Note ⚠️ recette.md soldée.
 
 - **Templates de troupes paramétriques (composants configurables)** ✅ IMPLÉMENTÉ [2026-06-07]
   `_UNIT_TYPES` → `_ROLE_TYPENAMES` + rôle `civ` (Civilian, CIV_WEIGHT=2kg).
