@@ -1174,7 +1174,7 @@ Minor cleanups identified — low priority, no functional impact.
   `addPlayerAircraftByType`, `aircraftTypeTable` (arch. v2 utilise typeName natif),
   `buildTimeFOB` (timing FOB interne), `crateWaitTime` (état manager),
   `minimumDeployDistance` (garde LGZ-unpack obsolète, FOB a `fobMinDistanceFromZones`).
-- **CL-8** Points config en attente d'analyse/décision (audit 2026-05-17) :
+- ~~**CL-8**~~ ✅ Points config — tous traités (audit 2026-05-17) :
   • ~~`dynamicLogisticUnitsIndex`~~ ✅ — feature résilience portée via `CTLDLogisticZone:isAlive()` + `CTLDFOBManager:_destroyFOB()` → `unregisterLogistic()`. FOB = seul moyen de créer une LGZ dynamique. MM guide §4 + §12 mis à jour [2026-05-19].
   • ~~`loadCrateFromMenu`~~ ✅ — gate `refreshLoadCrateSection` + `buildMenuSection` + `refreshCrateFlightSection` (3 sites câblés) ; recette F-B3-1→F-B3-5 5/5 PASS [2026-05-19]
   • ~~`maximumSearchDistance`~~ ✅ — câblé dans `_assignPostSpawnTask` `AttackNearestEnemyOnLos` (remplace hardcode 10000) ; recette F-B4-1→F-B4-3 3/3 PASS [2026-05-19]
