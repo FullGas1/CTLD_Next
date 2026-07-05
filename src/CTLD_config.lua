@@ -230,7 +230,7 @@ function CTLDConfig:load()
         ["BTR_D"] = 8000,
         ["M1045 HMMWV TOW"] = 3220,
         ["M1043 HMMWV Armament"] = 2500,
-        ["Hummer"] = 1200,  -- TEMP: reduced for UH-1H recette (real ~2400 kg)
+        ["Hummer"] = 2400,  -- M998 HMMWV unloaded ~2359 kg; rounded to 2400 (exceeds UH-1H limit of 1360 kg by design)
     }
 
     -- ═══════════════════════════════════════════════════════════
@@ -964,7 +964,7 @@ function CTLDConfig:load()
         return true, report
     else
         if self.settings["debug"] then
-            env.info("CTLDConfig: No YAML config data found in ctld.yamlConfigDatas")
+            ctld.utils.log("WARN", "CTLDConfig: No YAML config data found in ctld.yamlConfigDatas")
         end
     end
 

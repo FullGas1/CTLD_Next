@@ -68,8 +68,8 @@ function ctld.tr(text, ...)
     local _text
 
     if not ctld.i18n[ctld.i18n_lang] then
-        env.info(string.format("E - CTLDi18n.tr: language '%s' not found, defaulting to 'en'",
-            tostring(ctld.i18n_lang)))
+        ctld.utils.log("WARN", "CTLDi18n.tr: language '%s' not found, defaulting to 'en'",
+            tostring(ctld.i18n_lang))
         _text = ctld.i18n["en"][text]
     else
         _text = ctld.i18n[ctld.i18n_lang][text]
@@ -179,8 +179,7 @@ function ctld.i18n_check(language, verbose)
                 env.warning(string.format(
                     "CTLDi18n.i18n_check: UNTRANSLATED in %s: [%s]", language, textRef))
             elseif verbose then
-                env.info(string.format(
-                    "CTLDi18n.i18n_check: OK in %s: [%s]", language, textRef))
+                ctld.utils.log("INFO", "CTLDi18n.i18n_check: OK in %s: [%s]", language, textRef)
             end
         end
     end

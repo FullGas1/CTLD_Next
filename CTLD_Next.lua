@@ -275,7 +275,7 @@ function CTLDConfig:load()
         ["BTR_D"] = 8000,
         ["M1045 HMMWV TOW"] = 3220,
         ["M1043 HMMWV Armament"] = 2500,
-        ["Hummer"] = 1200,  -- TEMP: reduced for UH-1H recette (real ~2400 kg)
+        ["Hummer"] = 2400,  -- M998 HMMWV unloaded ~2359 kg; rounded to 2400 (exceeds UH-1H limit of 1360 kg by design)
     }
 
     -- ═══════════════════════════════════════════════════════════
@@ -1009,7 +1009,7 @@ function CTLDConfig:load()
         return true, report
     else
         if self.settings["debug"] then
-            env.info("CTLDConfig: No YAML config data found in ctld.yamlConfigDatas")
+            ctld.utils.log("WARN", "CTLDConfig: No YAML config data found in ctld.yamlConfigDatas")
         end
     end
 
@@ -1255,8 +1255,8 @@ function ctld.tr(text, ...)
     local _text
 
     if not ctld.i18n[ctld.i18n_lang] then
-        env.info(string.format("E - CTLDi18n.tr: language '%s' not found, defaulting to 'en'",
-            tostring(ctld.i18n_lang)))
+        ctld.utils.log("WARN", "CTLDi18n.tr: language '%s' not found, defaulting to 'en'",
+            tostring(ctld.i18n_lang))
         _text = ctld.i18n["en"][text]
     else
         _text = ctld.i18n[ctld.i18n_lang][text]
@@ -1366,8 +1366,7 @@ function ctld.i18n_check(language, verbose)
                 env.warning(string.format(
                     "CTLDi18n.i18n_check: UNTRANSLATED in %s: [%s]", language, textRef))
             elseif verbose then
-                env.info(string.format(
-                    "CTLDi18n.i18n_check: OK in %s: [%s]", language, textRef))
+                ctld.utils.log("INFO", "CTLDi18n.i18n_check: OK in %s: [%s]", language, textRef)
             end
         end
     end
@@ -11236,10 +11235,10 @@ function CTLDCrate:drop(position)
     self.loadTime = nil
 end
 
---- [Feature A stub] Start virtual parachute descent.
+--- Mark crate as parachuting. Physics (descent rate, lateral drift, wind) are
+-- computed by CTLDCrateManager:parachuteCrates() before this call.
 -- @param altitude number  current altitude AGL (metres)
 function CTLDCrate:startParachute(altitude)
-    -- TODO Feature A: implement parachute physics (descent rate, lateral drift)
     self.state                   = CTLDCrate.STATE.FALLING
     self.isParachuting           = true
     self.parachuteStartAltitude  = altitude

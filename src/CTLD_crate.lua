@@ -109,10 +109,10 @@ function CTLDCrate:drop(position)
     self.loadTime = nil
 end
 
---- [Feature A stub] Start virtual parachute descent.
+--- Mark crate as parachuting. Physics (descent rate, lateral drift, wind) are
+-- computed by CTLDCrateManager:parachuteCrates() before this call.
 -- @param altitude number  current altitude AGL (metres)
 function CTLDCrate:startParachute(altitude)
-    -- TODO Feature A: implement parachute physics (descent rate, lateral drift)
     self.state                   = CTLDCrate.STATE.FALLING
     self.isParachuting           = true
     self.parachuteStartAltitude  = altitude
