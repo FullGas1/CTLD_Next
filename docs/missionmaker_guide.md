@@ -163,8 +163,8 @@ _cfg.settings["capabilitiesByType"] = {
         maxWholeVehiclesOnboard  = 0,      -- max whole vehicles carried simultaneously
     },
     ["C-130J-30"] = {
-        cratesEnabled=true, troopsEnabled=true, canParachuteDrop=false, canSlingload=false,
-        canTransportWholeVehicle=true, useNativeDcsCargoSystem=false,
+        cratesEnabled=true, troopsEnabled=true, canParachuteDrop=true, canSlingload=false,
+        canTransportWholeVehicle=true, useNativeDcsCargoSystem=true, convertNativeLoadToCTLD=false,
         maxTroopsOnboard=80, maxCratesOnboard=20, maxWholeVehiclesOnboard=2,
         loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
         loadableVehiclesBLUE = { "M1045 HMMWV TOW", "M1043 HMMWV Armament" },
@@ -182,7 +182,8 @@ _cfg.settings["capabilitiesByType"] = {
 | `canParachuteDrop` | bool | Enables "Parachute" F10 entries |
 | `canSlingload` | bool | Enables hover-pickup and "Release/Cut Slingload" menus |
 | `canTransportWholeVehicle` | bool | Can load and re-deploy whole vehicles (Feature Q) |
-| `useNativeDcsCargoSystem` | bool | Uses DCS native cargo physics for crates |
+| `useNativeDcsCargoSystem` | bool | When `true`, CTLD spawns crates as DCS cargo objects (required for C-130, CH-47, UH-1H native cargo integration). When `false`, crates are spawned directly as static objects. |
+| `convertNativeLoadToCTLD` | bool | When `true`, any crate loaded via the DCS cargo UI is immediately converted to a CTLD-managed crate (destroys the DCS slot, prevents ghost crates). Set `true` for helicopters where the DCS cargo UI is accessible but CTLD parachute is needed (UH-1H, CH-47Fbl1). Leave `false` for aircraft that rely on DCS native cargo for ground ops or use DCS native parachute (C-130J-30, Il-76, Hercules). |
 | `maxTroopsOnboard` | number | Max soldiers this aircraft can carry (overrides `numberOfTroops`) |
 | `maxCratesOnboard` | number | Max crates loaded simultaneously (default: 1 for unlisted types) |
 | `maxWholeVehiclesOnboard` | number | Max whole vehicles carried simultaneously (0 = disabled) |
@@ -488,7 +489,7 @@ ctld.spawnableCrates["My Deployments"] = {
 ### Built-in scenes (ready to use)
 | Scene name | Description |
 |---|---|
-| `FARP Alpha` | Full FARP deployment: helipad, tent, ammo dump, fuel truck, repair truck, security squad, décor |
+| `FARP Alpha` | Full FARP deployment: helipad, tent, ammo dump, fuel truck, repair truck, security squad, decor |
 | `Countryside FARP` | Invisible-FARP heliport + tent + trucks + guards + lights. Warehouse is zeroed (visual FARP, no fuel service by default). Supports repack. |
 | `Metal FARP` | Metallic helipad (requires `Farp_FG_Petit_Helipad` mod) + tent + trucks + lights. Warehouse stocked with 10 000 L × 4 fuel types. Supports repack. |
 | `mineField` | Lays a configurable grid of landmines in front of the helicopter, marked on the F10 map |
@@ -1134,24 +1135,38 @@ CTLD can simulate parachute drops for crates, troops, and vehicles without relyi
 
 ### 6.1 Enabling parachute drops per aircraft
 
-Parachute menus are **hidden by default**. Enable them individually for each aircraft type via `canParachute = true` in `capabilitiesByType`:
+Parachute menus are **hidden by default**. Enable them individually for each aircraft type via `canParachuteDrop = true` in `capabilitiesByType`:
 
 ```lua
 _cfg.settings["capabilitiesByType"] = {
-    ["UH-1H"]     = { ..., canParachute = true  },
-    ["CH-47Fbl1"] = { ..., canParachute = true  },
-    ["Mi-8MT"]    = { ..., canParachute = false },
+    ["UH-1H"]     = { ..., canParachuteDrop = true  },
+    ["CH-47Fbl1"] = { ..., canParachuteDrop = true  },
+    ["Mi-8MT"]    = { ..., canParachuteDrop = false },
     -- ...
 }
 ```
 
-When `canParachute = true`, up to three F10 menu entries become available. Each appears **only in flight** and only when the relevant cargo is onboard:
+When `canParachuteDrop = true`, up to three F10 menu entries become available. Each appears **only in flight** and only when the relevant cargo is onboard:
 
 - **Parachute Crates** — drops all CTLD-loaded crates (excludes crates in active virtual slingload)
 - **Parachute Troops** — drops all embarked troops
 - **Parachute Vehicle** — drops the loaded whole vehicle
 
 > **Restriction — DCS native cargo:** crates loaded via the **DCS standard cargo UI** (not the CTLD F10 menu) are **excluded from the Parachute Crates menu**, even if CTLD has detected and claimed them in-flight. This is a hard DCS limitation: no API exists to free an aircraft cargo slot in-flight, so calling `destroy()` on a native cargo would permanently block the slot for the session. Players must use the CTLD F10 "Load Crate" menu to load crates that they intend to parachute.
+
+#### Per-aircraft crate parachute behavior
+
+The way crates are parachuted differs fundamentally between aircraft types, controlled by the `convertNativeLoadToCTLD` flag:
+
+| Aircraft type | `convertNativeLoadToCTLD` | Crate parachute method | 3D animation |
+| --- | --- | --- | --- |
+| C-130J-30, Il-76, Hercules | `false` | **DCS native parachute action** — use the aircraft built-in DCS parachute function. DCS handles the descent and renders a 3D parachute attached to each crate. CTLD claims the crates on landing. | Yes (DCS engine) |
+| UH-1H, CH-47Fbl1 | `true` | **CTLD F10 "Parachute Crates" menu** — crates loaded via the DCS cargo UI are immediately converted to CTLD-managed at load time. Use the CTLD F10 menu to drop; DCS native parachute has no effect on CTLD-managed crates. | No (virtual drop) |
+| Mi-8MT, Mi-24P | n/a | **None** (`canParachuteDrop = false`) — no parachute option for crates; ground deploy only. | No |
+
+> **C-130 workflow:** load crates via the DCS cargo station or CTLD F10 "Load Crate" menu, climb to drop altitude, then use the **C-130 DCS native parachute function** (not the CTLD F10 "Parachute Crates" entry). The crates descend with full 3D parachute animation and are automatically registered by CTLD when they land.
+>
+> **UH-1H / CH-47 workflow:** load crates via the CTLD F10 "Load Crate" menu (or DCS cargo UI — CTLD auto-converts), climb to drop altitude, then use **F10 > Helicopter Commands > Parachute Crates**. No 3D animation; crates are placed at the computed landing position after a simulated descent delay.
 
 All three share the same altitude gate: the action is refused (with an on-screen message) if the aircraft is below the configured minimum AGL for that payload type.
 
