@@ -480,7 +480,7 @@ function CTLDBeaconManager:listBeacons(transport)
     local msg = #lines > 0
         and (ctld.tr("Radio Beacons:") .. "\n" .. table.concat(lines, "\n"))
         or   ctld.tr("No Active Radio Beacons")
-    trigger.action.outTextForGroup(transport:getGroup():getID(), msg, 20)
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(transport), msg, 20)
 end
 
 --- Toggle the beacon map layer for a player.
@@ -513,12 +513,12 @@ function CTLDBeaconManager:toggleLayer(player, transport)
                 }
             end
         end
-        trigger.action.outTextForGroup(transport:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(transport),
             ctld.tr("Beacon layer enabled. %1 beacon(s).", #beaconsDisplayed), 10)
     else
         for _, mark in ipairs(state.marks) do self:_removeMarkId(mark.markId) end
         state.marks = {}
-        trigger.action.outTextForGroup(transport:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(transport),
             ctld.tr("Beacon layer disabled."), 10)
     end
 

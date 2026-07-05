@@ -714,6 +714,7 @@ function CTLDVehicleSpawner:_checkNativeLoading()
 
                         -- Check WAITING vehicles for bbox entry
                         for id, veh in pairs(waitingVehicles) do
+                            if not (veh.unit and veh.unit:isExist()) then goto continue_waiting end
                             local uPos = veh.unit:getPoint()
                             local lp   = self:_worldToLocal(uPos, transform)
                             if self:_isInBbox(lp, box) then
@@ -724,6 +725,7 @@ function CTLDVehicleSpawner:_checkNativeLoading()
                                 self._nativeTracked[tName][id] = true
                                 waitingVehicles[id] = nil  -- prevent double-fire
                             end
+                            ::continue_waiting::
                         end
 
                         -- Check LOADED (native) vehicles for bbox exit

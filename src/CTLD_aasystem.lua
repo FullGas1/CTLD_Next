@@ -429,7 +429,7 @@ function CTLDCrateAssemblyManager:_assemble(heli, crate, allCrates, template, ra
 
     if missingTxt ~= "" then
         trigger.action.outTextForGroup(
-            heli:getGroup():getID(),
+            ctld.utils.getGroupId(heli),
             ctld.tr("Cannot build %1\n%2\n\nOr the crates are not close enough together",
                     "Cannot build " .. template.name .. "\n" .. missingTxt ..
                     "\nOr the crates are not close enough together"),
@@ -443,7 +443,7 @@ function CTLDCrateAssemblyManager:_assemble(heli, crate, allCrates, template, ra
     local allowed       = self:getAllowedCount(coalitionId)
     if active + 1 > allowed then
         trigger.action.outTextForGroup(
-            heli:getGroup():getID(),
+            ctld.utils.getGroupId(heli),
             ctld.tr("Out of parts for AA Systems. Current limit is %1\n",
                     "Out of parts for AA Systems. Current limit is " .. allowed),
             10)
@@ -587,7 +587,7 @@ function CTLDCrateAssemblyManager:_repair(heli, crate, template)
     local nearest = self:_findNearest(heli, template)
     if not nearest or nearest.dist > _REARM_DIST then
         trigger.action.outTextForGroup(
-            heli:getGroup():getID(),
+            ctld.utils.getGroupId(heli),
             string.format("Cannot repair %s. No damaged %s within %dm",
                 template.name, template.name, _REARM_DIST),
             10)

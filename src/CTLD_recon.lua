@@ -578,7 +578,7 @@ function CTLDReconManager:scan(playerUnit, player)
     -- Gate: same key as the menu section (reconF10Menu).
     -- If the RECON menu is visible, scan must work without additional config.
     if not ctld.gs("reconF10Menu") then
-        trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
             ctld.tr("RECON is disabled (set reconF10Menu=true in config)."), 10)
         return
     end
@@ -589,7 +589,7 @@ function CTLDReconManager:scan(playerUnit, player)
     local agl    = pos.y - ground
     local minAlt = ctld.gs("reconMinAltitude") or 50
     if agl < minAlt then
-        trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
             ctld.tr("Altitude too low for recon scan (min %1 m)", minAlt), 10)
         return
     end
@@ -608,7 +608,7 @@ function CTLDReconManager:scan(playerUnit, player)
     -- activate layers via menu after Start without needing to restart RECON.
     -- Info message only on fresh Start (not on layer toggle re-scan).
     if #enabledLayers == 0 and not isRescan then
-        trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
             ctld.tr("RECON started. Activate layers to see targets."), 10)
     end
 
@@ -701,7 +701,7 @@ function CTLDReconManager:stopScan(playerUnit, player)
     self:_clearFarpMarks(player)
     self._activeScans[player] = nil
 
-    trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
         ctld.tr("Recon stopped. %1 targets hidden.", #marksRemoved), 10)
 
     EventDispatcher.getInstance():publish("OnReconHideTargets", {
@@ -725,7 +725,7 @@ end
 function CTLDReconManager:enableAutoRefresh(playerUnit, player, _fromScan)
     local scan = self._activeScans[player]
     if not scan then
-        trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
             ctld.tr("No active recon scan. Use 'Scan Area' first."), 10)
         return
     end
@@ -776,7 +776,7 @@ function CTLDReconManager:disableAutoRefresh(playerUnit, player)
         scan.refreshTimer = nil
     end
 
-    trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
         ctld.tr("Auto-refresh disabled. Current targets frozen on map."), 10)
 
     EventDispatcher.getInstance():publish("OnReconAutoRefreshDisabled", {
@@ -808,7 +808,7 @@ function CTLDReconManager:toggleLayer(player, playerUnit, layerId)
     layer.enabled = not layer.enabled
     local state   = layer.enabled and "ON" or "OFF"
 
-    trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
         ctld.tr("Recon layer '%1': %2", layer.name, state), 10)
 
     -- Immediate re-scan if scan is active (applies new layer state).

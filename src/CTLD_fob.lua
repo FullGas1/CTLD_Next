@@ -194,7 +194,7 @@ end
 function CTLDFOBManager:unpackFOBCrates(transport, player, sceneName)
     if not ctld.gs("enabledFOBBuilding") then return end
 
-    local gid = transport:getGroup():getID()
+    local gid = ctld.utils.getGroupId(transport)
 
     -- Guard: airborne
     if ctld.utils.inAir(transport) then
@@ -474,7 +474,7 @@ end
 -- @param transport DCS Unit
 function CTLDFOBManager:listFOBs(transport)
     local coalitionId = transport:getCoalition()
-    local gid         = transport:getGroup():getID()
+    local gid         = ctld.utils.getGroupId(transport)
     local all         = self:getFOBsForCoalition(coalitionId)
 
     -- Keep only alive FOBs

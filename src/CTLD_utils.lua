@@ -2038,6 +2038,16 @@ end
 -- This handles high-chassis aircraft (e.g. CH-47) whose fuselage centre sits above
 -- DCS's internal inAir threshold even when fully at rest on the ground.
 -- @param unit DCS Unit
+--- Safely return the DCS group ID for a unit.
+-- Returns -1 if the unit is nil or has no group (avoids nil-chain crash on getGroup():getID()).
+-- @param unit DCSUnit|nil
+-- @return number  group ID, or -1 if unavailable
+function ctld.utils.getGroupId(unit)
+    if not unit then return -1 end
+    local grp = unit:getGroup()
+    return grp and grp:getID() or -1
+end
+
 -- @return boolean
 function ctld.utils.inAir(unit)
     if not unit or not unit.inAir then return false end

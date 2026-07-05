@@ -5209,6 +5209,16 @@ end
 -- This handles high-chassis aircraft (e.g. CH-47) whose fuselage centre sits above
 -- DCS's internal inAir threshold even when fully at rest on the ground.
 -- @param unit DCS Unit
+--- Safely return the DCS group ID for a unit.
+-- Returns -1 if the unit is nil or has no group (avoids nil-chain crash on getGroup():getID()).
+-- @param unit DCSUnit|nil
+-- @return number  group ID, or -1 if unavailable
+function ctld.utils.getGroupId(unit)
+    if not unit then return -1 end
+    local grp = unit:getGroup()
+    return grp and grp:getID() or -1
+end
+
 -- @return boolean
 function ctld.utils.inAir(unit)
     if not unit or not unit.inAir then return false end
@@ -9493,28 +9503,28 @@ function CTLDTroopManager:embarkFromTroopZone(unit, zone, template)
 
     -- Zone coalition check
     if zone.coalition ~= 0 and zone.coalition ~= coalition then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("This pickup zone is not available to your coalition."), 10)
         return false
     end
 
     -- Position check: unit must be inside the zone
     if not zone:isInZone(unit:getPoint()) then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("You must land inside the pickup zone to load troops."), 10)
         return false
     end
 
     -- Zone active check
     if not zone.active then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("This pickup zone is not active."), 10)
         return false
     end
 
     -- Zone stock check (TRZ native: pickCurrentStock; 0=unlimited if pickMaxStock==0)
     if zone:hasPickup() and zone.pickMaxStock ~= 0 and zone.pickCurrentStock < template.total then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("This pickup zone is empty."), 10)
         return false
     end
@@ -9526,7 +9536,7 @@ function CTLDTroopManager:embarkFromTroopZone(unit, zone, template)
     do
         local ok, reason = self:_canEmbark(typeName, unitName, template.total, weight)
         if not ok then
-            trigger.action.outTextForGroup(unit:getGroup():getID(), reason, 10)
+            trigger.action.outTextForGroup(ctld.utils.getGroupId(unit), reason, 10)
             return false
         end
     end
@@ -9536,7 +9546,7 @@ function CTLDTroopManager:embarkFromTroopZone(unit, zone, template)
     if limits[1] ~= 0 or limits[2] ~= 0 then
         local inGame = self:_countDroppedTroops(coalition)
         if inGame + template.total > (limits[coalition] or 0) then
-            trigger.action.outTextForGroup(unit:getGroup():getID(),
+            trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
                 ctld.tr("Infantry coalition limit reached, cannot load more troops."), 10)
             return false
         end
@@ -9578,7 +9588,7 @@ function CTLDTroopManager:embarkFromTroopZone(unit, zone, template)
     -- Consume pickup stock (TRZ native API; no-op for unlimited zones)
     zone:consumeStock(template.total)
 
-    trigger.action.outTextForGroup(unit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
         ctld.tr("Loaded: %1 (%2 troops).", template.name, template.total), 10)
 
     ctld.utils.log("INFO", "embarkFromTroopZone: '%s' loaded '%s' (%d units, %.0f kg)",
@@ -9606,7 +9616,7 @@ function CTLDTroopManager:disembark(unit)
     local group    = list and list[1]
 
     if not group then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("No troops onboard."), 10)
         return false
     end
@@ -9615,7 +9625,7 @@ function CTLDTroopManager:disembark(unit)
     local onGround    = not self:_isInAir(unit)
 
     if not canFastRope and not onGround then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("Too high or too fast to drop troops! Hover below %1 ft or land.",
                 math.floor((ctld.gs("fastRopeMaximumHeight") or 18.28) * 3.2808399)), 10)
         return false
@@ -9725,7 +9735,7 @@ function CTLDTroopManager:disembark(unit)
     -- Confirm message
     local method = (canFastRope and self:_isInAir(unit)) and "fast-roped" or "dropped"
     local dest   = exzZone and ctld.tr("into %1", exzZone.zoneName) or ctld.tr("into combat")
-    trigger.action.outTextForGroup(unit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
         ctld.tr("%1 [%2] %3.", method, group.templateName, dest), 10)
 
     return true
@@ -9740,7 +9750,7 @@ function CTLDTroopManager:disembarkIndex(unit, idx)
     local unitName = unit:getName()
     local list     = self._inTransit[unitName]
     if not list or not list[idx] then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("No troops onboard."), 10)
         return false
     end
@@ -9753,7 +9763,7 @@ end
 -- @param unit DCS Unit
 function CTLDTroopManager:disembarkAll(unit)
     if not self:hasTroops(unit:getName()) then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("No troops onboard."), 10)
         return false
     end
@@ -9778,7 +9788,7 @@ function CTLDTroopManager:returnToTroopZone(unit, zone)
     local coalition = unit:getCoalition()
 
     if not list or #list == 0 then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("No troops onboard."), 10)
         return false
     end
@@ -9803,7 +9813,7 @@ function CTLDTroopManager:returnToTroopZone(unit, zone)
     local _pObj = CTLDPlayerManager.getInstance():getPlayer(unitName)
     if _pObj then self:refreshMenuSection(_pObj) end
 
-    trigger.action.outTextForGroup(unit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
         ctld.tr("Troops returned to base."), 10)
     return true
 end
@@ -9823,14 +9833,14 @@ function CTLDTroopManager:embarkFromField(unit)
     local typeName  = unit:getTypeName()
 
     if self:_isInAir(unit) then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("You must land to extract troops."), 10)
         return false
     end
 
     local nearest = self:_findNearestDropped(unit, coalition)
     if not nearest then
-        trigger.action.outTextForGroup(unit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
             ctld.tr("No extractable troops nearby!"), 10)
         return false
     end
@@ -9851,7 +9861,7 @@ function CTLDTroopManager:embarkFromField(unit)
     -- Capacity check: always use _canEmbark (cumulative); multi-group flag controls UI only.
     local ok, reason = self:_canEmbark(typeName, unitName, logicalCount, weight)
     if not ok then
-        trigger.action.outTextForGroup(unit:getGroup():getID(), reason, 10)
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit), reason, 10)
         return false
     end
 
@@ -9900,7 +9910,7 @@ function CTLDTroopManager:embarkFromField(unit)
     local _pObj = CTLDPlayerManager.getInstance():getPlayer(unitName)
     if _pObj then self:refreshMenuSection(_pObj) end
 
-    trigger.action.outTextForGroup(unit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
         ctld.tr("Extracted [%1] (%2 troops).", nearest.groupName, logicalCount), 10)
 
     ctld.utils.log("INFO", "extract: '%s' extracted group '%s' (%d logical troops, %d DCS units)",
@@ -10207,14 +10217,14 @@ function CTLDTroopManager:_menuUnloadOrExtract(unit)
     if inAir then
         local nearest = self:_findNearestDropped(unit, coalition)
         if nearest then
-            trigger.action.outTextForGroup(unit:getGroup():getID(),
+            trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
                 ctld.tr("Land near troops to extract them (%1m away).", math.floor(nearest.distM)), 10)
             return
         end
     end
 
     -- No troops, on ground, no nearby group
-    trigger.action.outTextForGroup(unit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(unit),
         ctld.tr("No troops onboard and no extractable troops nearby."), 10)
 end
 
@@ -10224,7 +10234,7 @@ end
 function CTLDTroopManager:_menuDisembark(unit)
     local unitName = unit:getName()
     if not self:hasTroops(unitName) then
-        trigger.action.outTextForGroup(unit:getGroup():getID(), ctld.tr("No troops onboard."), 10)
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(unit), ctld.tr("No troops onboard."), 10)
         return
     end
     local zm      = CTLDZoneManager.getInstance()
@@ -10309,7 +10319,7 @@ function CTLDTroopManager:_menuCheckCargo(unit)
     else
         msg = ctld.tr("No troops onboard.")
     end
-    trigger.action.outTextForGroup(unit:getGroup():getID(), msg, 10)
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(unit), msg, 10)
 end
 
 -- ============================================================
@@ -10704,7 +10714,7 @@ function CTLDTroopManager:refreshMenuSection(playerObj)
                                 if not u then return end
                                 local z = CTLDZoneManager.getInstance():getTroopZone(arg.zoneName)
                                 if not z then
-                                    trigger.action.outTextForGroup(u:getGroup():getID(),
+                                    trigger.action.outTextForGroup(ctld.utils.getGroupId(u),
                                         ctld.tr("Zone not found."), 10)
                                     return
                                 end
@@ -11716,7 +11726,7 @@ function CTLDCrateManager:refreshLoadCrateSection(playerObj)
                     local t = Unit.getByName(arg.unitName)
                     if not (t and t:isExist()) then return end
                     if ctld.utils.inAir(t) then
-                        trigger.action.outTextForGroup(t:getGroup():getID(),
+                        trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                             ctld.tr("You must land before you can load a crate!"), 10)
                         return
                     end
@@ -11728,7 +11738,7 @@ function CTLDCrateManager:refreshLoadCrateSection(playerObj)
                         if c:isLoaded() and c.loadedBy == t then onboard = onboard + 1 end
                     end
                     if onboard >= capacity then
-                        trigger.action.outTextForGroup(t:getGroup():getID(),
+                        trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                             ctld.tr("Maximum number of crates are on board!", onboard, capacity), 10)
                         return
                     end
@@ -11741,13 +11751,13 @@ function CTLDCrateManager:refreshLoadCrateSection(playerObj)
                         end
                     end
                     if not best then
-                        trigger.action.outTextForGroup(t:getGroup():getID(),
+                        trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                             ctld.tr("No crates within 50m to load!"), 10)
                         mgr:refreshLoadCrateSectionForUnit(arg.unitName)
                         return
                     end
                     mgr:loadCrate(best.crateName, t)
-                    trigger.action.outTextForGroup(t:getGroup():getID(),
+                    trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                         ctld.tr("Loaded %1 crate!", best.descriptor.desc), 10)
                 end,
                 { unitName = playerObj.unitName, crateDesc = desc })
@@ -11835,7 +11845,7 @@ function CTLDCrateManager:refreshUnpackSection(playerObj, _noRefresh)
                 function(arg)
                     local t = Unit.getByName(arg.unitName)
                     if not (t and t:isExist()) then return end
-                    local gid = t:getGroup():getID()
+                    local gid = ctld.utils.getGroupId(t)
                     if ctld.utils.inAir(t) then
                         trigger.action.outTextForGroup(gid,
                             ctld.tr("You must land before unpacking crates!"), 10)
@@ -11942,7 +11952,7 @@ function CTLDCrateManager:refreshUnpackSection(playerObj, _noRefresh)
                 function(arg)
                     local t = Unit.getByName(arg.unitName)
                     if not (t and t:isExist()) then return end
-                    local gid = t:getGroup():getID()
+                    local gid = ctld.utils.getGroupId(t)
                     if ctld.utils.inAir(t) then
                         trigger.action.outTextForGroup(gid, ctld.tr(arg.groundErrKey), 10)
                         return
@@ -12080,7 +12090,7 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir, _no
                     ctld.utils.log("INFO", "[PackCallback] unit not found: %s", tostring(arg.unitName))
                     return
                 end
-                local gid = t:getGroup():getID()
+                local gid = ctld.utils.getGroupId(t)
                 if ctld.utils.inAir(t) then
                     trigger.action.outTextForGroup(gid,
                         ctld.tr("You must be on the ground to pack a FARP."), 10)
@@ -13784,20 +13794,20 @@ function CTLDCrateManager:refreshRequestEquipmentSection(playerObj)
         local t = Unit.getByName(arg.unitName)
         if not (t and t:isExist()) then return end
         if ctld.utils.inAir(t) then
-            trigger.action.outTextForGroup(t:getGroup():getID(),
+            trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                 ctld.tr("You must be landed to request a crate."), 10)
             return
         end
         local selZone = CTLDZoneManager.getInstance():getLogisticZone(arg.zoneName)
         if not (selZone and selZone.active and selZone:isAlive()
                 and selZone:isInZone(t:getPoint())) then
-            trigger.action.outTextForGroup(t:getGroup():getID(),
+            trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                 ctld.tr("You are not close enough to friendly logistics to get a crate!"), 10)
             return
         end
         local safeDist = (ctld.utils.getSecureDistanceFromUnit(arg.unitName) or 10) + 5
         local mgr      = CTLDCrateManager.getInstance()
-        local gid      = t:getGroup():getID()
+        local gid      = ctld.utils.getGroupId(t)
         if arg.multiple then
             local descriptors = {}
             for _, weight in ipairs(arg.multiple) do
@@ -13987,7 +13997,7 @@ function CTLDCrateManager:buildMenuSection(playerObj, menu)
         function(arg)
             local t = Unit.getByName(arg.unitName)
             if not (t and t:isExist()) then return end
-            local gid = t:getGroup():getID()
+            local gid = ctld.utils.getGroupId(t)
             if ctld.utils.inAir(t) then
                 trigger.action.outTextForGroup(gid,
                     ctld.tr("You must land before dropping crates!"), 10)
@@ -14039,7 +14049,7 @@ function CTLDCrateManager:buildMenuSection(playerObj, menu)
         function(arg)
             local t = Unit.getByName(arg.unitName)
             if not (t and t:isExist()) then return end
-            local gid  = t:getGroup():getID()
+            local gid  = ctld.utils.getGroupId(t)
             local mgr  = CTLDCrateManager.getInstance()
             local nearby = mgr:getCratesInRange(t:getPoint(), 300)
 
@@ -14150,7 +14160,7 @@ function CTLDCrateManager:buildSmokeSection(playerObj, menu)
             or  "Smoke auto-resume OFF"
         local msg = ctld.tr(msgKey):gsub("%%1", tostring(interval))
         local u = Unit.getByName(arg.unitName)
-        local gid = u and u:getGroup() and u:getGroup():getID() or -1
+        local gid = ctld.utils.getGroupId(u)
         trigger.action.outTextForGroup(gid, msg, 10)
         ctld.utils.log("INFO", "CTLDSmokeManager: toggle for '%s' active=%s", arg.unitName, tostring(newState))
         -- Rebuild the full menu model (not just DCS layer) so the toggle label updates.
@@ -14989,6 +14999,7 @@ function CTLDVehicleSpawner:_checkNativeLoading()
 
                         -- Check WAITING vehicles for bbox entry
                         for id, veh in pairs(waitingVehicles) do
+                            if not (veh.unit and veh.unit:isExist()) then goto continue_waiting end
                             local uPos = veh.unit:getPoint()
                             local lp   = self:_worldToLocal(uPos, transform)
                             if self:_isInBbox(lp, box) then
@@ -14999,6 +15010,7 @@ function CTLDVehicleSpawner:_checkNativeLoading()
                                 self._nativeTracked[tName][id] = true
                                 waitingVehicles[id] = nil  -- prevent double-fire
                             end
+                            ::continue_waiting::
                         end
 
                         -- Check LOADED (native) vehicles for bbox exit
@@ -16121,7 +16133,7 @@ end
 function CTLDFOBManager:unpackFOBCrates(transport, player, sceneName)
     if not ctld.gs("enabledFOBBuilding") then return end
 
-    local gid = transport:getGroup():getID()
+    local gid = ctld.utils.getGroupId(transport)
 
     -- Guard: airborne
     if ctld.utils.inAir(transport) then
@@ -16401,7 +16413,7 @@ end
 -- @param transport DCS Unit
 function CTLDFOBManager:listFOBs(transport)
     local coalitionId = transport:getCoalition()
-    local gid         = transport:getGroup():getID()
+    local gid         = ctld.utils.getGroupId(transport)
     local all         = self:getFOBsForCoalition(coalitionId)
 
     -- Keep only alive FOBs
@@ -16890,7 +16902,7 @@ function CTLDCrateAssemblyManager:_assemble(heli, crate, allCrates, template, ra
 
     if missingTxt ~= "" then
         trigger.action.outTextForGroup(
-            heli:getGroup():getID(),
+            ctld.utils.getGroupId(heli),
             ctld.tr("Cannot build %1\n%2\n\nOr the crates are not close enough together",
                     "Cannot build " .. template.name .. "\n" .. missingTxt ..
                     "\nOr the crates are not close enough together"),
@@ -16904,7 +16916,7 @@ function CTLDCrateAssemblyManager:_assemble(heli, crate, allCrates, template, ra
     local allowed       = self:getAllowedCount(coalitionId)
     if active + 1 > allowed then
         trigger.action.outTextForGroup(
-            heli:getGroup():getID(),
+            ctld.utils.getGroupId(heli),
             ctld.tr("Out of parts for AA Systems. Current limit is %1\n",
                     "Out of parts for AA Systems. Current limit is " .. allowed),
             10)
@@ -17048,7 +17060,7 @@ function CTLDCrateAssemblyManager:_repair(heli, crate, template)
     local nearest = self:_findNearest(heli, template)
     if not nearest or nearest.dist > _REARM_DIST then
         trigger.action.outTextForGroup(
-            heli:getGroup():getID(),
+            ctld.utils.getGroupId(heli),
             string.format("Cannot repair %s. No damaged %s within %dm",
                 template.name, template.name, _REARM_DIST),
             10)
@@ -17754,7 +17766,7 @@ function CTLDBeaconManager:listBeacons(transport)
     local msg = #lines > 0
         and (ctld.tr("Radio Beacons:") .. "\n" .. table.concat(lines, "\n"))
         or   ctld.tr("No Active Radio Beacons")
-    trigger.action.outTextForGroup(transport:getGroup():getID(), msg, 20)
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(transport), msg, 20)
 end
 
 --- Toggle the beacon map layer for a player.
@@ -17787,12 +17799,12 @@ function CTLDBeaconManager:toggleLayer(player, transport)
                 }
             end
         end
-        trigger.action.outTextForGroup(transport:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(transport),
             ctld.tr("Beacon layer enabled. %1 beacon(s).", #beaconsDisplayed), 10)
     else
         for _, mark in ipairs(state.marks) do self:_removeMarkId(mark.markId) end
         state.marks = {}
-        trigger.action.outTextForGroup(transport:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(transport),
             ctld.tr("Beacon layer disabled."), 10)
     end
 
@@ -18705,7 +18717,7 @@ function CTLDReconManager:scan(playerUnit, player)
     -- Gate: same key as the menu section (reconF10Menu).
     -- If the RECON menu is visible, scan must work without additional config.
     if not ctld.gs("reconF10Menu") then
-        trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
             ctld.tr("RECON is disabled (set reconF10Menu=true in config)."), 10)
         return
     end
@@ -18716,7 +18728,7 @@ function CTLDReconManager:scan(playerUnit, player)
     local agl    = pos.y - ground
     local minAlt = ctld.gs("reconMinAltitude") or 50
     if agl < minAlt then
-        trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
             ctld.tr("Altitude too low for recon scan (min %1 m)", minAlt), 10)
         return
     end
@@ -18735,7 +18747,7 @@ function CTLDReconManager:scan(playerUnit, player)
     -- activate layers via menu after Start without needing to restart RECON.
     -- Info message only on fresh Start (not on layer toggle re-scan).
     if #enabledLayers == 0 and not isRescan then
-        trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
             ctld.tr("RECON started. Activate layers to see targets."), 10)
     end
 
@@ -18828,7 +18840,7 @@ function CTLDReconManager:stopScan(playerUnit, player)
     self:_clearFarpMarks(player)
     self._activeScans[player] = nil
 
-    trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
         ctld.tr("Recon stopped. %1 targets hidden.", #marksRemoved), 10)
 
     EventDispatcher.getInstance():publish("OnReconHideTargets", {
@@ -18852,7 +18864,7 @@ end
 function CTLDReconManager:enableAutoRefresh(playerUnit, player, _fromScan)
     local scan = self._activeScans[player]
     if not scan then
-        trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+        trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
             ctld.tr("No active recon scan. Use 'Scan Area' first."), 10)
         return
     end
@@ -18903,7 +18915,7 @@ function CTLDReconManager:disableAutoRefresh(playerUnit, player)
         scan.refreshTimer = nil
     end
 
-    trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
         ctld.tr("Auto-refresh disabled. Current targets frozen on map."), 10)
 
     EventDispatcher.getInstance():publish("OnReconAutoRefreshDisabled", {
@@ -18935,7 +18947,7 @@ function CTLDReconManager:toggleLayer(player, playerUnit, layerId)
     layer.enabled = not layer.enabled
     local state   = layer.enabled and "ON" or "OFF"
 
-    trigger.action.outTextForGroup(playerUnit:getGroup():getID(),
+    trigger.action.outTextForGroup(ctld.utils.getGroupId(playerUnit),
         ctld.tr("Recon layer '%1': %2", layer.name, state), 10)
 
     -- Immediate re-scan if scan is active (applies new layer state).

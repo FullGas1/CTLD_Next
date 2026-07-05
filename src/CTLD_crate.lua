@@ -590,7 +590,7 @@ function CTLDCrateManager:refreshLoadCrateSection(playerObj)
                     local t = Unit.getByName(arg.unitName)
                     if not (t and t:isExist()) then return end
                     if ctld.utils.inAir(t) then
-                        trigger.action.outTextForGroup(t:getGroup():getID(),
+                        trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                             ctld.tr("You must land before you can load a crate!"), 10)
                         return
                     end
@@ -602,7 +602,7 @@ function CTLDCrateManager:refreshLoadCrateSection(playerObj)
                         if c:isLoaded() and c.loadedBy == t then onboard = onboard + 1 end
                     end
                     if onboard >= capacity then
-                        trigger.action.outTextForGroup(t:getGroup():getID(),
+                        trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                             ctld.tr("Maximum number of crates are on board!", onboard, capacity), 10)
                         return
                     end
@@ -615,13 +615,13 @@ function CTLDCrateManager:refreshLoadCrateSection(playerObj)
                         end
                     end
                     if not best then
-                        trigger.action.outTextForGroup(t:getGroup():getID(),
+                        trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                             ctld.tr("No crates within 50m to load!"), 10)
                         mgr:refreshLoadCrateSectionForUnit(arg.unitName)
                         return
                     end
                     mgr:loadCrate(best.crateName, t)
-                    trigger.action.outTextForGroup(t:getGroup():getID(),
+                    trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                         ctld.tr("Loaded %1 crate!", best.descriptor.desc), 10)
                 end,
                 { unitName = playerObj.unitName, crateDesc = desc })
@@ -709,7 +709,7 @@ function CTLDCrateManager:refreshUnpackSection(playerObj, _noRefresh)
                 function(arg)
                     local t = Unit.getByName(arg.unitName)
                     if not (t and t:isExist()) then return end
-                    local gid = t:getGroup():getID()
+                    local gid = ctld.utils.getGroupId(t)
                     if ctld.utils.inAir(t) then
                         trigger.action.outTextForGroup(gid,
                             ctld.tr("You must land before unpacking crates!"), 10)
@@ -816,7 +816,7 @@ function CTLDCrateManager:refreshUnpackSection(playerObj, _noRefresh)
                 function(arg)
                     local t = Unit.getByName(arg.unitName)
                     if not (t and t:isExist()) then return end
-                    local gid = t:getGroup():getID()
+                    local gid = ctld.utils.getGroupId(t)
                     if ctld.utils.inAir(t) then
                         trigger.action.outTextForGroup(gid, ctld.tr(arg.groundErrKey), 10)
                         return
@@ -954,7 +954,7 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir, _no
                     ctld.utils.log("INFO", "[PackCallback] unit not found: %s", tostring(arg.unitName))
                     return
                 end
-                local gid = t:getGroup():getID()
+                local gid = ctld.utils.getGroupId(t)
                 if ctld.utils.inAir(t) then
                     trigger.action.outTextForGroup(gid,
                         ctld.tr("You must be on the ground to pack a FARP."), 10)
@@ -2658,20 +2658,20 @@ function CTLDCrateManager:refreshRequestEquipmentSection(playerObj)
         local t = Unit.getByName(arg.unitName)
         if not (t and t:isExist()) then return end
         if ctld.utils.inAir(t) then
-            trigger.action.outTextForGroup(t:getGroup():getID(),
+            trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                 ctld.tr("You must be landed to request a crate."), 10)
             return
         end
         local selZone = CTLDZoneManager.getInstance():getLogisticZone(arg.zoneName)
         if not (selZone and selZone.active and selZone:isAlive()
                 and selZone:isInZone(t:getPoint())) then
-            trigger.action.outTextForGroup(t:getGroup():getID(),
+            trigger.action.outTextForGroup(ctld.utils.getGroupId(t),
                 ctld.tr("You are not close enough to friendly logistics to get a crate!"), 10)
             return
         end
         local safeDist = (ctld.utils.getSecureDistanceFromUnit(arg.unitName) or 10) + 5
         local mgr      = CTLDCrateManager.getInstance()
-        local gid      = t:getGroup():getID()
+        local gid      = ctld.utils.getGroupId(t)
         if arg.multiple then
             local descriptors = {}
             for _, weight in ipairs(arg.multiple) do
@@ -2861,7 +2861,7 @@ function CTLDCrateManager:buildMenuSection(playerObj, menu)
         function(arg)
             local t = Unit.getByName(arg.unitName)
             if not (t and t:isExist()) then return end
-            local gid = t:getGroup():getID()
+            local gid = ctld.utils.getGroupId(t)
             if ctld.utils.inAir(t) then
                 trigger.action.outTextForGroup(gid,
                     ctld.tr("You must land before dropping crates!"), 10)
@@ -2913,7 +2913,7 @@ function CTLDCrateManager:buildMenuSection(playerObj, menu)
         function(arg)
             local t = Unit.getByName(arg.unitName)
             if not (t and t:isExist()) then return end
-            local gid  = t:getGroup():getID()
+            local gid  = ctld.utils.getGroupId(t)
             local mgr  = CTLDCrateManager.getInstance()
             local nearby = mgr:getCratesInRange(t:getPoint(), 300)
 
@@ -3024,7 +3024,7 @@ function CTLDCrateManager:buildSmokeSection(playerObj, menu)
             or  "Smoke auto-resume OFF"
         local msg = ctld.tr(msgKey):gsub("%%1", tostring(interval))
         local u = Unit.getByName(arg.unitName)
-        local gid = u and u:getGroup() and u:getGroup():getID() or -1
+        local gid = ctld.utils.getGroupId(u)
         trigger.action.outTextForGroup(gid, msg, 10)
         ctld.utils.log("INFO", "CTLDSmokeManager: toggle for '%s' active=%s", arg.unitName, tostring(newState))
         -- Rebuild the full menu model (not just DCS layer) so the toggle label updates.
