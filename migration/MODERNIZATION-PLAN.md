@@ -836,6 +836,7 @@ Deliverable: single `.lua` file produced by `tools/build/merge_CTLD.ps1`.
           MT-09 4/4 PASS [2026-05-19] — pickup troupes+véhicule AIZ_P_TV, dropoff AIZ_D
           MT-10a ✅ PASS [2026-06-06] — re-recette Feature S (zones depuis userConfig) : gotoNearestWPZ PASS
           MT-10b ✅ PASS [2026-06-06] — re-recette Feature S : AttackNearestEnemyOnLos PASS
+          ✅ Re-recette MT-07→MT-10 PASS [2026-07-05] — 7+12+14+23=56/56 PASS (debug mode, mission accélérée, clone AI + waitFor)
 
 ✅  FG  SVG troops transport flows — schéma visuel transport troupes  [2026-06-28]
         docs/assets/troops_transport_flows.svg produit (même format que transport_flows.svg)
