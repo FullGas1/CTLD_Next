@@ -77,6 +77,22 @@
 - Utiliser uniquement l'API DCS officielle documentée sur https://wiki.hoggitworld.com/view/Simulator_Scripting_Engine_Documentation
 - Le terme "repack" (ancienne définition) est banni — utiliser "pack" (nouvelle méthode) partout : méthodes, config, menus.
 
+### ⚠️ Lua 5.1 strict — règle impérative à chaque génération de code
+
+**Tout code produit ou modifié dans `src/` et `tests/` doit être compatible Lua 5.1 strict.** DCS World exécute les scripts de mission en Lua 5.1. Les constructions suivantes sont **interdites** :
+
+| Interdit (Lua 5.2+) | Remplacer par (Lua 5.1) |
+| --- | --- |
+| `goto label` / `::label::` | `if/then/else` ou restructuration de boucle |
+| `<const>` / `<close>` | variables locales normales |
+| `table.move` | boucle `for` manuelle |
+| `string.gmatch` avec `%g` | pattern alternatif |
+| `math.type` | `type(x) == "number"` |
+| `utf8.*` | absent en 5.1 |
+| `table.pack` / `table.unpack` sans guard | `{...}` / `unpack(...)` (global en 5.1) |
+
+**Vérification obligatoire avant commit** : relire tout nouveau bloc de code et confirmer l'absence de syntaxe 5.2+. En cas de doute, préférer la forme la plus simple et explicite.
+
 ## Fin de chaque réponse
 
 Conclure **chaque réponse** par un encadré d'avancement de la consommation de tokens :
