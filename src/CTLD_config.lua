@@ -491,6 +491,11 @@ function CTLDConfig:load()
     --   maxWholeVehiclesOnboard  (int)   max whole vehicles in hold; 0 = no vehicle transport
     --   loadableVehiclesRED      (table) DCS unit types loadable as whole vehicles (RED coalition)
     --   loadableVehiclesBLUE     (table) DCS unit types loadable as whole vehicles (BLUE coalition)
+    --   convertNativeLoadToCTLD  (bool)  when true, a DCS-native cargo load is immediately converted
+    --                                    to CTLD-managed (destroys the DCS slot, frees the ghost).
+    --                                    Use for aircraft where the DCS cargo UI must not be exposed
+    --                                    (e.g. UH-1H).  Leave false for aircraft that rely on the
+    --                                    DCS cargo system for ground ops (C-130J-30, CH-47Fbl1).
 
     self.settings["capabilitiesByType"] = {
 
@@ -500,6 +505,7 @@ function CTLDConfig:load()
         ["76MD"] = {  -- Il-76 mod (exact DCS type name)
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = false,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 80,  maxCratesOnboard = 20,  maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -508,6 +514,7 @@ function CTLDConfig:load()
         ["Hercules"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = false,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 30,  maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -516,11 +523,13 @@ function CTLDConfig:load()
         ["SK-60"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
             canTransportWholeVehicle = false, useNativeDcsCargoSystem = false,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 4,   maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 0,
         },
         ["UH-60L"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = true,
             canTransportWholeVehicle = false, useNativeDcsCargoSystem = false,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 12,  maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 0,
         },
         -- ["T-45"] = { cratesEnabled=true, troopsEnabled=true, canParachuteDrop=false, canSlingload=false,
@@ -534,11 +543,13 @@ function CTLDConfig:load()
         ["Mi-8MT"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = true,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 16,  maxCratesOnboard = 2,   maxWholeVehiclesOnboard = 0,
         },
         ["Mi-24P"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
             canTransportWholeVehicle = false, useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 10,  maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 0,
         },
         -- ["SA342L"]      = { cratesEnabled=false, troopsEnabled=true,  canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=4 },
@@ -547,7 +558,8 @@ function CTLDConfig:load()
         -- ["SA342Minigun"]= { cratesEnabled=false, troopsEnabled=true,  canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=3 },
         ["UH-1H"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true,  canSlingload = true,
-            canTransportWholeVehicle = true,  useNativeDcsCargoSystem = false,
+            canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = true,   -- DCS cargo UI causes ghost crates; force CTLD-managed
             maxTroopsOnboard = 8,   maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 1,
             maxVehicleWeight = 1360,  -- ~3000 lbs internal cargo capacity
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -556,6 +568,7 @@ function CTLDConfig:load()
         ["CH-47Fbl1"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true, canSlingload = true,
             canTransportWholeVehicle = false, useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = true,   -- DCS cargo UI causes ghost crates; force CTLD-managed
             maxTroopsOnboard = 40,  maxCratesOnboard = 8,   maxWholeVehiclesOnboard = 1,
             maxVehicleWeight = 11000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -568,6 +581,7 @@ function CTLDConfig:load()
         ["C-130J-30"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = false,  -- DCS cargo system retained for ground ops
             maxTroopsOnboard = 80,  maxCratesOnboard = 22,  maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },

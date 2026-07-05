@@ -1544,6 +1544,19 @@ Suivre `tests/manual_test_sequences.md` — aucun script, observation directe.
   2. **Boucle anti-collision spawn** (`getSpawnObjectPositions`) : au spawn d’une caisse via menu CTLD, l’axe est tourné de 45° (8 essais max) jusqu’à ce qu’aucun point candidat ne soit dans la bbox d’un appareil DynamicCargo voisin — élimine les faux positifs post-spawn. Implémenté via `CTLDCrateManager:_getDynamicBBoxes()` + `_pointInBBoxLocal` dans `CTLD_utils.lua`.
   Note : dwell-time (appareil stationnaire glissant lentement sur une caisse) non implémenté — hors scope (gain nul avec le filtre vitesse).
 
+- ✅ **TODO-MENU-1** [2026-07-05] : **CH-47 smoke bug — menu refresh éjection** — root cause : oscillation LAND↔TAKEOFF du flight-state poller déclenchait 4-6 `menu:refresh()` simultanés par transition, reconstruisant le menu DCS et éjectant le joueur de sa position dans le sous-menu. Fix en deux parties :
+  1. **`_noRefresh` parameter** (`CTLD_crate.lua`) : `refreshUnpackSection` + `refreshPackEquiptSection` n’appellent plus `menu:refresh()` quand appelées depuis `refreshUnpackSectionForUnit` ou `refreshCrateFlightSection` — le refresh est consolidé en 1 seul appel en fin.
+  2. **Debounce 150ms** (`CTLD_menu.lua`) : `ctld.Menu:refresh()` → `deferredRefreshForGroup()` : tous les appels dans une fenêtre de 150ms sont coalesçés en un seul rebuild DCS. `CTLDPlayerManager:refreshForUnit` utilise également `deferredRefreshForGroup` directement.
+  Validé live DCS [2026-07-05] : CH-47 au sol avec crates chargées, click "Crate Commands → Drop Crate(s)" → crates déposées correctement, plus de smoke bleue parasite.
+
+- ✅ **TODO-MENU-2** [2026-07-05] : **`_lgzGroundPoll` éjection menu Request Equipment** — le poller LGZ (10s tick) reconstruisait le menu `Request Equipment` pour tous les joueurs au sol toutes les 10s, éjectant le joueur de tout sous-menu en cours de navigation. Fix : le rebuild n’est déclenché que si le set de zones logistiques change (`_lgzKey` par joueur, calculé via `getLogisticZonesAtPoint` + tri+concat). Un joueur stationnaire dans la même zone ne déclenche plus aucun rebuild périodique.
+  Validé live DCS [2026-07-05] : navigation "Request Equipment → Both → Countryside FARP - All crates" stable, 3 crates FARP spawned correctement.
+
+- ✅ **TODO-MENU-3** [2026-07-05] : **Menu non mis à jour après déploiement de scène** — après `playScene` (ex. Countryside FARP), le menu "Pack Equipt" ne montrait pas le bouton Pack et "Unpack Crate" conservait l’entrée consommée, jusqu’au prochain décollage/atterrissage. Fix : ajout d’un `onComplete` callback sur l’appel `playScene` dans le chemin unpack générique qui appelle `refreshUnpackSectionForUnit(unitName)` à la fin de la scène (~30s pour CS FARP). Cela déclenche un refresh unpack+pack en un seul rebuild DCS.
+  Validé live DCS [2026-07-05] : après déploiement CS FARP, "Pack Countryside FARP" apparaît dans Crate Commands sans décoller/atterrir.
+
+- ✅ **TODO-MENU-4** [2026-07-05] : **Cycle infini unpack→pack→unpack Countryside FARP avec mémoire warehouse** — recette complète du cycle : Request Equipment → 3 crates FARP → load CH-47 → unpack → FARP déployé → pack → crates respawnées avec `warehouseSnapshot` → reload → re-unpack → FARP redéployé avec stock warehouse restauré. Validé live DCS [2026-07-05] PASS.
+
 ---
 
 ## Risks and mitigations

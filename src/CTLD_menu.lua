@@ -67,7 +67,7 @@ function ctld.MenuManager:getInstance()
 end
 
 function ctld.MenuManager:_new()
-    local obj = { menus = {} }
+    local obj = { menus = {}, _pendingRefresh = {} }
     setmetatable(obj, { __index = ctld.MenuManager })
     return obj
 end
@@ -87,9 +87,28 @@ function ctld.MenuManager:createMenuForGroup(groupId)
     return menu
 end
 
+-- Debounced refresh: coalesce all refresh() calls for a given group within
+-- DEBOUNCE_S seconds into a single DCS rebuild.  This prevents rapid-fire
+-- calls (flight-state poller oscillation, cargo detection, landing events)
+-- from ejecting the player from the F10 menu mid-navigation.
+local DEBOUNCE_S = 0.15   -- seconds — one DCS frame is ~0.02 s; 0.15 s absorbs any burst
+function ctld.MenuManager:deferredRefreshForGroup(groupId)
+    if not self.menus[groupId] then return end
+    if self._pendingRefresh[groupId] then return end   -- already scheduled
+    self._pendingRefresh[groupId] = true
+    local selfRef = self
+    timer.scheduleFunction(function()
+        selfRef._pendingRefresh[groupId] = nil
+        if selfRef.menus[groupId] then
+            selfRef:refreshMenuForGroup(groupId)
+        end
+    end, nil, timer.getTime() + DEBOUNCE_S)
+end
+
 -- Wipe the entire DCS menu for groupId, then rebuild from the memory model.
 -- ALL-OR-NOTHING: avoids partial / inconsistent DCS menu states.
 -- Children are rendered in ORDER-field order (see ORDER CONVENTION above).
+-- Direct callers (buildMenu on player enter) bypass the debounce intentionally.
 function ctld.MenuManager:refreshMenuForGroup(groupId)
     if not self.menus[groupId] then
         ctld.logWarning("ctld.MenuManager:refreshMenuForGroup: no menu for group %s", tostring(groupId))
@@ -99,8 +118,14 @@ function ctld.MenuManager:refreshMenuForGroup(groupId)
 
     -- Remove only CTLD's own top-level entries — never wipe the whole group menu
     -- (nil path would also destroy standard DCS entries such as Ground Crew / ATC).
+    -- We use the opaque DCS handle stored at the previous build (_dcsHandle).
+    -- Passing a string array ({"CTLD"}) to removeItemForGroup is silently ignored by DCS,
+    -- which expects the opaque handle returned by addSubMenuForGroup/addCommandForGroup.
     for _, item in ipairs(menu.children) do
-        missionCommands.removeItemForGroup(groupId, { item.name })
+        if item._dcsHandle ~= nil then
+            missionCommands.removeItemForGroup(groupId, item._dcsHandle)
+            item._dcsHandle = nil
+        end
     end
 
     local count = 0
@@ -137,7 +162,10 @@ function ctld.MenuManager:_rebuildMenuNode(groupId, parentPath, node)
     local dcsPath = #parentPath > 0 and parentPath or nil
 
     if node.type == "submenu" then
-        missionCommands.addSubMenuForGroup(groupId, node.name, dcsPath)
+        -- Capture the DCS handle so refreshMenuForGroup can remove this item precisely
+        -- on the next rebuild (removeItemForGroup requires the opaque handle, not a string path).
+        local h = missionCommands.addSubMenuForGroup(groupId, node.name, dcsPath)
+        node._dcsHandle = h
         count = count + 1
         -- Build the child path for this submenu level.
         local childPath = {}
@@ -457,7 +485,7 @@ end
 
 -- Wipe DCS menu + rebuild from memory model (ordered, paged). Convenience shortcut.
 function ctld.Menu:refresh()
-    return self.manager:refreshMenuForGroup(self.groupId)
+    return self.manager:deferredRefreshForGroup(self.groupId)
 end
 
 -- =============================================================================

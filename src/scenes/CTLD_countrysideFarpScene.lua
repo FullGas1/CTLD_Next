@@ -36,7 +36,6 @@ countrysideFarpScene.crate = {
     groundKey      = "You must be on the ground to deploy a FARP.",
     cratesRequired = 3,
     side           = nil,
-    showSets       = false,
 }
 
 countrysideFarpScene.steps = {
@@ -211,12 +210,32 @@ countrysideFarpScene.steps = {
                     -- Invisible FARP airbases (DCS built-in) return nil for getWarehouse().
                     -- Only mod-based helipad FARPs have an accessible warehouse.
                     if w then
-                        -- If this is a redeployed FARP, restore the snapshot; otherwise zero the warehouse.
+                        -- If this is a redeployed FARP, restore the full snapshot; otherwise zero the warehouse.
                         local snap = ctx.scene._params.repackData
                                   and ctx.scene._params.repackData.warehouseSnapshot
-                        if snap and snap.liquid then
+                        if snap then
+                            -- Liquids
                             for fuelType = 0, 3 do
-                                w:setLiquidAmount(fuelType, snap.liquid[fuelType] or 0)
+                                w:setLiquidAmount(fuelType, snap.liquid and snap.liquid[fuelType] or 0)
+                            end
+                            -- Weapons: clear current, then set snapshot values
+                            local cur = w:getInventory()
+                            for typeName in pairs(cur and cur.weapon or {}) do
+                                if not (snap.weapon and snap.weapon[typeName]) then
+                                    w:setItem(typeName, 0)
+                                end
+                            end
+                            for typeName, count in pairs(snap.weapon or {}) do
+                                w:setItem(typeName, count)
+                            end
+                            -- Aircraft: clear current, then set snapshot values
+                            for typeName in pairs(cur and cur.aircraft or {}) do
+                                if not (snap.aircraft and snap.aircraft[typeName]) then
+                                    w:setItem(typeName, 0)
+                                end
+                            end
+                            for typeName, count in pairs(snap.aircraft or {}) do
+                                w:setItem(typeName, count)
                             end
                         else
                             w:setLiquidAmount(0, 0)   -- jet fuel
@@ -376,13 +395,16 @@ countrysideFarpScene.onRepack = function(scene, repackData)
     if not ab then return end
     local w = ab:getWarehouse()
     if not w then return end   -- Invisible FARP has no warehouse
+    local inv = w:getInventory()
     repackData.warehouseSnapshot = {
         liquid = {
             [0] = w:getLiquidAmount(0),   -- jet fuel
             [1] = w:getLiquidAmount(1),   -- aviation gasoline
             [2] = w:getLiquidAmount(2),   -- MW50
             [3] = w:getLiquidAmount(3),   -- diesel
-        }
+        },
+        weapon   = inv and inv.weapon   or {},
+        aircraft = inv and inv.aircraft or {},
     }
 end
 

@@ -235,7 +235,7 @@ function CTLDPlayerManager:init()
                                 CTLDTroopManager.getInstance():refreshMenuSection(playerObj)
                                 CTLDCrateManager.getInstance():refreshRequestEquipmentSection(playerObj)
                                 CTLDCrateManager.getInstance():refreshLoadCrateSection(playerObj)
-                                CTLDCrateManager.getInstance():refreshUnpackSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshUnpackSection(playerObj, true)  -- _noRefresh: refreshCrateFlightSection below calls refresh()
                                 CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj, false)
                                 CTLDVehicleSpawner.getInstance():refreshLoadSection(playerObj)
                                 CTLDVehicleSpawner.getInstance():refreshUnloadSection(playerObj)
@@ -383,7 +383,7 @@ function CTLDPlayerManager:onLand(event)
         CTLDTroopManager.getInstance():refreshMenuSection(captured)
         CTLDCrateManager.getInstance():refreshRequestEquipmentSection(captured)
         CTLDCrateManager.getInstance():refreshLoadCrateSection(captured)
-        CTLDCrateManager.getInstance():refreshUnpackSection(captured)
+        CTLDCrateManager.getInstance():refreshUnpackSection(captured, true)  -- _noRefresh: refreshCrateFlightSection below calls refresh()
         -- Pass overrideInAir=false: S_EVENT_LAND fires before inAir() crosses its threshold;
         -- force ground state immediately rather than relying on the speed/AGL check.
         CTLDCrateManager.getInstance():refreshCrateFlightSection(captured, false)
@@ -583,7 +583,7 @@ end
 function CTLDPlayerManager:refreshForUnit(unitName)
     local playerObj = self._players[unitName]
     if not playerObj then return end
-    ctld.MenuManager:getInstance():refreshMenuForGroup(playerObj.groupId)
+    ctld.MenuManager:getInstance():deferredRefreshForGroup(playerObj.groupId)
 end
 
 --- Refresh F10 menus for all currently tracked players.

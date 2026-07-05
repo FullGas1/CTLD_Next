@@ -536,6 +536,11 @@ function CTLDConfig:load()
     --   maxWholeVehiclesOnboard  (int)   max whole vehicles in hold; 0 = no vehicle transport
     --   loadableVehiclesRED      (table) DCS unit types loadable as whole vehicles (RED coalition)
     --   loadableVehiclesBLUE     (table) DCS unit types loadable as whole vehicles (BLUE coalition)
+    --   convertNativeLoadToCTLD  (bool)  when true, a DCS-native cargo load is immediately converted
+    --                                    to CTLD-managed (destroys the DCS slot, frees the ghost).
+    --                                    Use for aircraft where the DCS cargo UI must not be exposed
+    --                                    (e.g. UH-1H).  Leave false for aircraft that rely on the
+    --                                    DCS cargo system for ground ops (C-130J-30, CH-47Fbl1).
 
     self.settings["capabilitiesByType"] = {
 
@@ -545,6 +550,7 @@ function CTLDConfig:load()
         ["76MD"] = {  -- Il-76 mod (exact DCS type name)
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = false,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 80,  maxCratesOnboard = 20,  maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -553,6 +559,7 @@ function CTLDConfig:load()
         ["Hercules"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = false,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 30,  maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -561,11 +568,13 @@ function CTLDConfig:load()
         ["SK-60"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
             canTransportWholeVehicle = false, useNativeDcsCargoSystem = false,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 4,   maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 0,
         },
         ["UH-60L"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = true,
             canTransportWholeVehicle = false, useNativeDcsCargoSystem = false,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 12,  maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 0,
         },
         -- ["T-45"] = { cratesEnabled=true, troopsEnabled=true, canParachuteDrop=false, canSlingload=false,
@@ -579,11 +588,13 @@ function CTLDConfig:load()
         ["Mi-8MT"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = true,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 16,  maxCratesOnboard = 2,   maxWholeVehiclesOnboard = 0,
         },
         ["Mi-24P"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = false, canSlingload = false,
             canTransportWholeVehicle = false, useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = false,
             maxTroopsOnboard = 10,  maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 0,
         },
         -- ["SA342L"]      = { cratesEnabled=false, troopsEnabled=true,  canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=4 },
@@ -592,7 +603,8 @@ function CTLDConfig:load()
         -- ["SA342Minigun"]= { cratesEnabled=false, troopsEnabled=true,  canParachuteDrop=false, canSlingload=false, maxTroopsOnboard=3 },
         ["UH-1H"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true,  canSlingload = true,
-            canTransportWholeVehicle = true,  useNativeDcsCargoSystem = false,
+            canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = true,   -- DCS cargo UI causes ghost crates; force CTLD-managed
             maxTroopsOnboard = 8,   maxCratesOnboard = 1,   maxWholeVehiclesOnboard = 1,
             maxVehicleWeight = 1360,  -- ~3000 lbs internal cargo capacity
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -601,6 +613,7 @@ function CTLDConfig:load()
         ["CH-47Fbl1"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true, canSlingload = true,
             canTransportWholeVehicle = false, useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = true,   -- DCS cargo UI causes ghost crates; force CTLD-managed
             maxTroopsOnboard = 40,  maxCratesOnboard = 8,   maxWholeVehiclesOnboard = 1,
             maxVehicleWeight = 11000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -613,6 +626,7 @@ function CTLDConfig:load()
         ["C-130J-30"] = {
             cratesEnabled = true, troopsEnabled = true, canParachuteDrop = true, canSlingload = false,
             canTransportWholeVehicle = true,  useNativeDcsCargoSystem = true,
+            convertNativeLoadToCTLD = false,  -- DCS cargo system retained for ground ops
             maxTroopsOnboard = 80,  maxCratesOnboard = 22,  maxWholeVehiclesOnboard = 2,
             maxVehicleWeight = 20000,
             loadableVehiclesRED  = { "BRDM-2", "BTR_D" },
@@ -5454,7 +5468,7 @@ function ctld.MenuManager:getInstance()
 end
 
 function ctld.MenuManager:_new()
-    local obj = { menus = {} }
+    local obj = { menus = {}, _pendingRefresh = {} }
     setmetatable(obj, { __index = ctld.MenuManager })
     return obj
 end
@@ -5474,9 +5488,28 @@ function ctld.MenuManager:createMenuForGroup(groupId)
     return menu
 end
 
+-- Debounced refresh: coalesce all refresh() calls for a given group within
+-- DEBOUNCE_S seconds into a single DCS rebuild.  This prevents rapid-fire
+-- calls (flight-state poller oscillation, cargo detection, landing events)
+-- from ejecting the player from the F10 menu mid-navigation.
+local DEBOUNCE_S = 0.15   -- seconds — one DCS frame is ~0.02 s; 0.15 s absorbs any burst
+function ctld.MenuManager:deferredRefreshForGroup(groupId)
+    if not self.menus[groupId] then return end
+    if self._pendingRefresh[groupId] then return end   -- already scheduled
+    self._pendingRefresh[groupId] = true
+    local selfRef = self
+    timer.scheduleFunction(function()
+        selfRef._pendingRefresh[groupId] = nil
+        if selfRef.menus[groupId] then
+            selfRef:refreshMenuForGroup(groupId)
+        end
+    end, nil, timer.getTime() + DEBOUNCE_S)
+end
+
 -- Wipe the entire DCS menu for groupId, then rebuild from the memory model.
 -- ALL-OR-NOTHING: avoids partial / inconsistent DCS menu states.
 -- Children are rendered in ORDER-field order (see ORDER CONVENTION above).
+-- Direct callers (buildMenu on player enter) bypass the debounce intentionally.
 function ctld.MenuManager:refreshMenuForGroup(groupId)
     if not self.menus[groupId] then
         ctld.logWarning("ctld.MenuManager:refreshMenuForGroup: no menu for group %s", tostring(groupId))
@@ -5486,8 +5519,14 @@ function ctld.MenuManager:refreshMenuForGroup(groupId)
 
     -- Remove only CTLD's own top-level entries — never wipe the whole group menu
     -- (nil path would also destroy standard DCS entries such as Ground Crew / ATC).
+    -- We use the opaque DCS handle stored at the previous build (_dcsHandle).
+    -- Passing a string array ({"CTLD"}) to removeItemForGroup is silently ignored by DCS,
+    -- which expects the opaque handle returned by addSubMenuForGroup/addCommandForGroup.
     for _, item in ipairs(menu.children) do
-        missionCommands.removeItemForGroup(groupId, { item.name })
+        if item._dcsHandle ~= nil then
+            missionCommands.removeItemForGroup(groupId, item._dcsHandle)
+            item._dcsHandle = nil
+        end
     end
 
     local count = 0
@@ -5524,7 +5563,10 @@ function ctld.MenuManager:_rebuildMenuNode(groupId, parentPath, node)
     local dcsPath = #parentPath > 0 and parentPath or nil
 
     if node.type == "submenu" then
-        missionCommands.addSubMenuForGroup(groupId, node.name, dcsPath)
+        -- Capture the DCS handle so refreshMenuForGroup can remove this item precisely
+        -- on the next rebuild (removeItemForGroup requires the opaque handle, not a string path).
+        local h = missionCommands.addSubMenuForGroup(groupId, node.name, dcsPath)
+        node._dcsHandle = h
         count = count + 1
         -- Build the child path for this submenu level.
         local childPath = {}
@@ -5844,7 +5886,7 @@ end
 
 -- Wipe DCS menu + rebuild from memory model (ordered, paged). Convenience shortcut.
 function ctld.Menu:refresh()
-    return self.manager:refreshMenuForGroup(self.groupId)
+    return self.manager:deferredRefreshForGroup(self.groupId)
 end
 
 -- =============================================================================
@@ -11382,6 +11424,37 @@ function CTLDCrateManager.getInstance()
         timer.scheduleFunction(function()
             CTLDCrateManager.getInstance():checkHoverStatus()
         end, {}, timer.getTime() + 1)
+        -- LGZ ground-position poller (10s tick): refreshes Request Equipment only
+        -- when the player's logistic zone set changes (entry/exit). Avoids rebuilding
+        -- the DCS menu on a fixed cadence, which would eject players from sub-menus.
+        local function _lgzZoneKey(zones)
+            if not next(zones) then return "" end
+            local names = {}
+            for _, z in ipairs(zones) do names[#names + 1] = z.name end
+            table.sort(names)
+            return table.concat(names, ",")
+        end
+        local function _lgzGroundPoll(_, t)
+            local pm_ref = CTLDPlayerManager.getInstance()
+            local cm_ref = CTLDCrateManager.getInstance()
+            local zm_ref = CTLDZoneManager.getInstance()
+            for _, pObj in pairs(pm_ref._players) do
+                if pObj._isFlying == false then
+                    local unit = Unit.getByName(pObj.unitName)
+                    if unit and unit:isExist() and not ctld.utils.inAir(unit) then
+                        local zones  = zm_ref:getLogisticZonesAtPoint(
+                            unit:getPoint(), pObj.coalition, "cratesPickup")
+                        local newKey = _lgzZoneKey(zones)
+                        if pObj._lgzKey ~= newKey then
+                            pObj._lgzKey = newKey
+                            cm_ref:refreshRequestEquipmentSection(pObj)
+                        end
+                    end
+                end
+            end
+            return t + 10
+        end
+        timer.scheduleFunction(_lgzGroundPoll, {}, timer.getTime() + 10)
         -- Detect crates destroyed by combat (S_EVENT_DEAD on the static object).
         local ok, bridge = pcall(CTLDDCSEventBridge.getInstance)
         if ok and bridge then
@@ -11430,7 +11503,7 @@ function CTLDCrateManager:_injectSceneCrate(sceneName, model)
         unit           = sceneName,
         side           = cd.side,
         cratesRequired = cd.cratesRequired or 1,
-        showSets       = cd.showSets or false,
+        showSets       = (cd.showSets == nil) and true or cd.showSets,
     }
     self._weightIndex[w] = entry
 
@@ -11447,7 +11520,20 @@ function CTLDCrateManager:_injectSceneCrate(sceneName, model)
         end
     end
     if not already then
-        table.insert(self._processedCrates[cat].singleCrates, { singleCrate = entry })
+        local showCrateSets = ctld.gs("enableAllCrates") ~= false
+        local pe = { singleCrate = entry }
+        local cr = entry.cratesRequired
+        if cr > 1 and showCrateSets and entry.showSets then
+            local weights = {}
+            for i = 1, cr do weights[i] = w end
+            pe.singleTypeSet = {
+                multiple       = weights,
+                desc           = entry.desc .. " - " .. ctld.tr("All crates"),
+                side           = entry.side,
+                _autoGenerated = true,
+            }
+        end
+        table.insert(self._processedCrates[cat].singleCrates, pe)
     end
     ctld.utils.log("INFO", "_injectSceneCrate: injected '%s' weight=%.2f", sceneName, w)
 end
@@ -11675,10 +11761,14 @@ end
 -- @param unitName string
 function CTLDCrateManager:refreshUnpackSectionForUnit(unitName)
     local playerObj = CTLDPlayerManager.getInstance()._players[unitName]
-    if playerObj then
-        self:refreshUnpackSection(playerObj)
-        self:refreshPackEquiptSection(playerObj)
-    end
+    if not playerObj then return end
+    -- Both sub-refreshes update the memory model without triggering a DCS rebuild.
+    -- A single refresh() at the end coalesces all changes into one DCS round-trip,
+    -- preventing the CH-47 native-cargo tick from ejecting the player from the menu.
+    self:refreshUnpackSection(playerObj, true)
+    self:refreshPackEquiptSection(playerObj, nil, true)
+    local menu = ctld.MenuManager:getInstance():getMenuByGroupId(playerObj.groupId)
+    if menu then menu:refresh() end
 end
 
 --- Rebuild the "Unpack Crate" dynamic submenu for playerObj.
@@ -11686,7 +11776,7 @@ end
 -- Each entry spawns the vehicle at unpack time.
 -- Called on land, crate spawn, crate cleared.
 -- @param playerObj CTLDPlayer
-function CTLDCrateManager:refreshUnpackSection(playerObj)
+function CTLDCrateManager:refreshUnpackSection(playerObj, _noRefresh)
     local caps = (ctld.gs("capabilitiesByType") or {})[playerObj.typeName]
     if not (playerObj.isTransport and caps and caps.cratesEnabled) then return end
 
@@ -11704,7 +11794,7 @@ function CTLDCrateManager:refreshUnpackSection(playerObj)
     if not (transport and transport:isExist()) or ctld.utils.inAir(transport) then
         menu:addCommand({ root, cratesSub, unpackSub },
             ctld.tr("Land to unpack crates"), function() end, {})
-        menu:refresh()
+         if not _noRefresh then menu:refresh() end
         return
     end
 
@@ -11883,8 +11973,12 @@ function CTLDCrateManager:refreshUnpackSection(playerObj)
                         end
                         mgr:unpackCrate(c.crateName, t)
                     end
+                    local _uName = arg.unitName
                     CTLDSceneManager.getInstance():playScene(t, arg.sceneName,
-                        repackData and { repackData = repackData } or nil, nil)
+                        repackData and { repackData = repackData } or nil,
+                        function()
+                            CTLDCrateManager.getInstance():refreshUnpackSectionForUnit(_uName)
+                        end)
                 end,
                 {
                     unitName      = playerObj.unitName,
@@ -11899,7 +11993,7 @@ function CTLDCrateManager:refreshUnpackSection(playerObj)
         menu:addCommand({ root, cratesSub, unpackSub },
             ctld.tr("No complete crate sets nearby"), function() end, {})
     end
-    menu:refresh()
+     if not _noRefresh then menu:refresh() end
 end
 
 --- Rebuild the unified "Pack Equipt" dynamic submenu for playerObj.
@@ -11907,7 +12001,7 @@ end
 -- Visible only when on the ground — absent in flight.
 -- Lists repackable FARP scenes (within 300 m) and packable vehicles nearby.
 -- @param playerObj CTLDPlayer
-function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir)
+function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir, _noRefresh)
     local farpEnabled    = ctld.gs("enableFARPRepack") == true
     local vehicleEnabled = ctld.gs("enablePackingVehicles") == true
     if not (farpEnabled or vehicleEnabled) then return end
@@ -11923,11 +12017,13 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir)
     local cratesSub = ctld.tr("Crate Commands")
     local packSub   = ctld.tr("Pack Equipt")
 
+    -- Ensure Pack Equipt node exists before clearBranch/setBranchEnabled operate on it.
+    menu:addSubMenu({ root, cratesSub }, packSub, { order = 25 })
     menu:clearBranch({ root, cratesSub, packSub })
 
     local transport = Unit.getByName(playerObj.unitName)
     if not (transport and transport:isExist()) then
-        menu:refresh()
+        if not _noRefresh then menu:refresh() end
         return
     end
 
@@ -11945,7 +12041,7 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir)
         -- clearBranch empties children but keeps the node in the tree (enabled=true).
         -- setBranchEnabled hides it from DCS rendering on next refresh().
         menu:setBranchEnabled({ root, cratesSub, packSub }, false)
-        menu:refresh()
+        if not _noRefresh then menu:refresh() end
         return
     end
 
@@ -11968,19 +12064,23 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir)
     -- If nothing to pack, hide the submenu and return.
     if #scenes == 0 and #packableVehicles == 0 then
         menu:setBranchEnabled({ root, cratesSub, packSub }, false)
-        menu:refresh()
+        if not _noRefresh then menu:refresh() end
         return
     end
-
-    menu:addSubMenu({ root, cratesSub }, packSub, { order = 25 })
 
     -- FARP entries
     for _, scene in ipairs(scenes) do
         local label = ctld.tr("Pack %1", scene._modelName)
         menu:addCommand({ root, cratesSub, packSub }, label,
             function(arg)
+                ctld.utils.log("INFO", "[PackCallback] ENTER unitName=%s sceneName=%s",
+                    tostring(arg.unitName), tostring(arg.sceneName))
+                trigger.action.outText("[PackCallback] ENTER "..tostring(arg.unitName), 8)
                 local t = Unit.getByName(arg.unitName)
-                if not (t and t:isExist()) then return end
+                if not (t and t:isExist()) then
+                    ctld.utils.log("INFO", "[PackCallback] unit not found: %s", tostring(arg.unitName))
+                    return
+                end
                 local gid = t:getGroup():getID()
                 if ctld.utils.inAir(t) then
                     trigger.action.outTextForGroup(gid,
@@ -12036,7 +12136,7 @@ function CTLDCrateManager:refreshPackEquiptSection(playerObj, overrideInAir)
               coalition        = playerObj.coalition })
     end
 
-    menu:refresh()
+    if not _noRefresh then menu:refresh() end
 end
 
 --- Replace the parachute visual effect handler.
@@ -12317,73 +12417,58 @@ function CTLDCrateManager:_checkNativeDCSCargo()
                     local vel  = entry.transport:getVelocity()
                     local spd2 = vel.x * vel.x + vel.y * vel.y + vel.z * vel.z
                     if spd2 <= 0.25 and _pointInBBox(entry.unitPos, entry.bbox, cratePos, 0.5) then
-                        -- Memorize local-frame offset for drift-based unload detection.
-                        local up = entry.unitPos
-                        local dx = cratePos.x - up.p.x
-                        local dy = cratePos.y - up.p.y
-                        local dz = cratePos.z - up.p.z
-                        self._nativeCrateLink[crate.crateName] = {
-                            lx = dx * up.x.x + dy * up.x.y + dz * up.x.z,
-                            ly = dx * up.y.x + dy * up.y.y + dz * up.y.z,
-                            lz = dx * up.z.x + dy * up.z.y + dz * up.z.z,
-                        }
-                        crate:load(entry.transport)
-
-                        -- If the transport can parachute, convert this DCS-native load to
-                        -- CTLD-managed immediately (we are still on the ground / low hover,
-                        -- so UnloadCargo() is a valid ground operation that properly frees
-                        -- the DCS cargo slot).  The original static is destroyed after a
-                        -- short delay to let DCS complete the slot-release process.
-                        -- Result: the crate is fully CTLD-managed and can be parachuted
-                        -- via the CTLD menu in flight without any ghost or slot blockage.
-                        --
-                        -- If the transport cannot parachute, keep the DCS-native state so
-                        -- the player retains the DCS cargo UI (en-soute view, ground drop).
                         local _caps = (ctld.gs("capabilitiesByType") or {})[entry.transport:getTypeName()]
-                        local _convertToCTLD = _caps and _caps.canParachuteDrop
-                        local _loadMethod
+                        local _convertToCTLD = _caps and _caps.convertNativeLoadToCTLD
 
                         if _convertToCTLD then
-                            -- Convert: release DCS slot (ground op), suppress drift detection,
-                            -- schedule destruction of original static after DCS processes the unload.
+                            -- Undo the DCS UI load, then trigger the full CTLD load path
+                            -- (identical to the F10 menu): UnloadCargo() releases the DCS
+                            -- cargo slot; after DCS processes the release (0.5 s), loadCrate()
+                            -- handles state transition, static destruction, weight update,
+                            -- OnCrateLoaded + OnCrateCleared events, and menu refresh.
                             local _origStatic = crate.dcsStatic
-                            crate.dcsStatic         = nil    -- detach from CTLD tracking now
-                            crate.loadedByDCSNative = false  -- fully CTLD-managed
-                            self._nativeCrateLink[crate.crateName] = nil  -- suppress drift
-                            pcall(function() entry.transport:UnloadCargo(_origStatic) end)
+                            local _crateName  = crate.crateName
+                            local _transport  = entry.transport
+                            local _unitName   = entry.unitName
+                            local _groupId    = entry.playerObj.groupId
+                            pcall(function() _transport:UnloadCargo(_origStatic) end)
                             timer.scheduleFunction(function()
-                                if _origStatic and _origStatic:isExist() then
-                                    _origStatic:destroy()
-                                end
+                                self:loadCrate(_crateName, _transport)
+                                local _c = self.crates[_crateName]
+                                local _lbl = _c and _c.descriptor and _c.descriptor.desc or _crateName
+                                ctld.utils.log("INFO",
+                                    "CTLDCrateManager: DCS UI LOAD → CTLD-managed — crate=%s carrier=%s",
+                                    _crateName, _unitName)
+                                trigger.action.outTextForGroup(_groupId,
+                                    string.format("[CTLD] Crate loaded (parachute-ready): %s", _lbl), 8)
                             end, nil, timer.getTime() + 0.5)
-                            ctld.utils.updateTransportWeight(entry.unitName)
-                            _loadMethod = "ctld"
                         else
-                            -- Keep DCS-native: slot managed by DCS, parachute not available in-flight.
+                            -- DCS-native: memorize local-frame offset for drift-based unload
+                            -- detection, mark as DCS-managed (no parachute available in-flight).
+                            local up = entry.unitPos
+                            local dx = cratePos.x - up.p.x
+                            local dy = cratePos.y - up.p.y
+                            local dz = cratePos.z - up.p.z
+                            self._nativeCrateLink[crate.crateName] = {
+                                lx = dx * up.x.x + dy * up.x.y + dz * up.x.z,
+                                ly = dx * up.y.x + dy * up.y.y + dz * up.y.z,
+                                lz = dx * up.z.x + dy * up.z.y + dz * up.z.z,
+                            }
+                            crate:load(entry.transport)
                             crate.loadedByDCSNative = true
-                            _loadMethod = "dcs_native"
-                        end
-
-                        self:_publish("OnCrateLoaded", {
-                            crate           = crate,
-                            crateName       = crate.crateName,
-                            carrierUnitName = entry.unitName,
-                            coalition       = crate.coalition,
-                            descriptor      = crate.descriptor,
-                            method          = _loadMethod,
-                            timestamp       = timer.getAbsTime(),
-                        })
-                        pm:refreshForUnit(entry.unitName)
-                        self:refreshUnpackSectionForUnit(entry.unitName)
-                        self:refreshCrateFlightSectionForUnit(entry.unitName)
-                        local _descLabel = crate.descriptor and crate.descriptor.desc or crate.crateName
-                        if _convertToCTLD then
-                            ctld.utils.log("INFO",
-                                "CTLDCrateManager: DCS native LOAD → CTLD-managed (canParachuteDrop) — crate=%s carrier=%s",
-                                crate.crateName, entry.unitName)
-                            trigger.action.outTextForGroup(entry.playerObj.groupId,
-                                string.format("[CTLD] Crate loaded (parachute-ready): %s", _descLabel), 8)
-                        else
+                            self:_publish("OnCrateLoaded", {
+                                crate           = crate,
+                                crateName       = crate.crateName,
+                                carrierUnitName = entry.unitName,
+                                coalition       = crate.coalition,
+                                descriptor      = crate.descriptor,
+                                method          = "dcs_native",
+                                timestamp       = timer.getAbsTime(),
+                            })
+                            pm:refreshForUnit(entry.unitName)
+                            self:refreshUnpackSectionForUnit(entry.unitName)
+                            self:refreshCrateFlightSectionForUnit(entry.unitName)
+                            local _descLabel = crate.descriptor and crate.descriptor.desc or crate.crateName
                             ctld.utils.log("INFO",
                                 "CTLDCrateManager: DCS native LOAD (DCS-managed, no parachute) — crate=%s carrier=%s",
                                 crate.crateName, entry.unitName)
@@ -12437,11 +12522,15 @@ function CTLDCrateManager:_checkNativeDCSCargo()
                             local inFlight  = (tp.y - groundH) > 5
                             self._nativeCrateLink[crate.crateName] = nil
                             crate.position = cratePos
-                            crate.state    = CTLDCrate.STATE.LANDED
                             crate.loadedBy = nil
                             crate.loadTime = nil
                             if inFlight then
+                                -- DCS physically simulates the parachute descent.
+                                -- Stay FALLING until the static actually touches ground.
+                                crate.state         = CTLDCrate.STATE.FALLING
                                 crate.fromParachute = true
+                            else
+                                crate.state = CTLDCrate.STATE.LANDED
                             end
                             self:_publish("OnCrateUnloaded", {
                                 crate      = crate,
@@ -12462,13 +12551,14 @@ function CTLDCrateManager:_checkNativeDCSCargo()
                                 crate.crateName, drift, tostring(inFlight), tostring(crate.fromParachute))
                             local _descLabel2 = crate.descriptor and crate.descriptor.desc or crate.crateName
                             local _unloadMsg  = inFlight
-                                and string.format("[CTLD] Crate dropped (DCS native, airborne): %s", _descLabel2)
+                                and string.format("[CTLD] Crate falling (DCS native parachute): %s", _descLabel2)
                                 or  string.format("[CTLD] Crate unloaded (DCS native): %s", _descLabel2)
                             if playerObj then
                                 trigger.action.outTextForGroup(playerObj.groupId, _unloadMsg, 8)
                             end
-                            if crate.fromParachute then
-                                self:_checkAutoUnpack(crate)
+                            if inFlight then
+                                -- Poll dcsStatic altitude until ground contact, then auto-unpack.
+                                self:_scheduleParachuteLandingPoll(crate)
                             end
                         end
                     end
@@ -13353,10 +13443,10 @@ function CTLDCrateManager:parachuteCrates(transport, playerObj)
             #loaded, math.floor(estDescentTime)), 10)
 
     for _, crate in ipairs(loaded) do
-        -- Note: DCS-native crates on canParachuteDrop transports are converted to
-        -- CTLD-managed at load-detection time (loadedByDCSNative=false, dcsStatic=nil).
-        -- This guard is kept as a safety net for any residual native-loaded crate
-        -- that reaches this path, but in practice it should never fire.
+        -- DCS-native crates (convertNativeLoadToCTLD=false, e.g. C-130) keep
+        -- loadedByDCSNative=true and dcsStatic alive.  We must destroy the original
+        -- static before the virtual parachute descent so _respawnStatic can create a
+        -- fresh one at the landing position without leaving a DCS-side duplicate.
         if crate.loadedByDCSNative and crate.dcsStatic and crate.dcsStatic:isExist() then
             crate.dcsStatic:destroy()
             crate.dcsStatic = nil
@@ -13429,10 +13519,73 @@ function CTLDCrateManager:parachuteCrates(transport, playerObj)
             self:_checkAutoUnpack(_crate)
         end, {}, timer.getTime() + descentTime)
     end
-    -- All crates left the transport: update flight-state menu (disable Parachute Crates).
+    -- All crates are now FALLING: update transport weight immediately so the
+    -- flight model reflects the drop at once (not delayed until each crate lands).
+    ctld.utils.updateTransportWeight(transport:getName())
+    -- Update flight-state menu (disable Parachute Crates).
     -- playerObj may be a raw arg table from the menu callback — fetch the real CTLDPlayer.
     local _pObj = CTLDPlayerManager.getInstance():getPlayer(playerObj.unitName)
     if _pObj then self:refreshCrateFlightSection(_pObj) end
+end
+
+--- Poll the DCS-simulated altitude of a natively parachuted crate until it lands.
+-- Called when a C-130 (or any dynamic-cargo aircraft) releases a crate in flight via the
+-- DCS Dynamic Cargo UI. DCS physically animates the descent; CTLD must NOT auto-unpack
+-- before the static actually touches the ground.
+--
+-- Polls every 1 s. Declares the crate landed when AGL ≤ 3 m, then calls _checkAutoUnpack.
+-- Falls back to a 120-second timeout in case of degenerate AGL (unlikely terrain artefacts).
+--
+-- @param crate CTLDCrate   crate in STATE.FALLING with a live dcsStatic
+function CTLDCrateManager:_scheduleParachuteLandingPoll(crate)
+    local POLL_INTERVAL = 1.0   -- seconds between altitude checks
+    local MAX_WAIT      = 120   -- safety timeout (seconds)
+    local AGL_THRESHOLD = 3.0   -- metres AGL to declare landed
+    local startTime     = timer.getTime()
+
+    local function poll(_, t)
+        -- Crate already transitioned out of FALLING (unpacked, reloaded, destroyed…)
+        if crate.state ~= CTLDCrate.STATE.FALLING then return nil end
+
+        -- Safety timeout — declare landed at last known position
+        if (timer.getTime() - startTime) > MAX_WAIT then
+            ctld.utils.log("WARN",
+                "CTLDCrateManager:_scheduleParachuteLandingPoll: timeout — declaring %s landed",
+                crate.crateName)
+            crate.state = CTLDCrate.STATE.LANDED
+            CTLDCrateManager.getInstance():_checkAutoUnpack(crate)
+            return nil
+        end
+
+        -- DCS static destroyed mid-fall (e.g. enemy fire) — silently abandon
+        if not (crate.dcsStatic and crate.dcsStatic:isExist()) then
+            ctld.utils.log("INFO",
+                "CTLDCrateManager:_scheduleParachuteLandingPoll: dcsStatic gone for %s — landing cancelled",
+                crate.crateName)
+            crate.state = CTLDCrate.STATE.LANDED
+            return nil
+        end
+
+        local p   = crate.dcsStatic:getPoint()
+        local agl = p.y - land.getHeight({ x = p.x, y = p.z })
+
+        if agl <= AGL_THRESHOLD then
+            crate.state    = CTLDCrate.STATE.LANDED
+            crate.position = { x = p.x, y = p.y, z = p.z }
+            ctld.utils.log("INFO",
+                "CTLDCrateManager:_scheduleParachuteLandingPoll: %s landed at (%.0f,%.0f) AGL=%.1f m",
+                crate.crateName, p.x, p.z, agl)
+            CTLDCrateManager.getInstance():_checkAutoUnpack(crate)
+            return nil
+        end
+
+        return t + POLL_INTERVAL
+    end
+
+    ctld.utils.log("INFO",
+        "CTLDCrateManager:_scheduleParachuteLandingPoll: tracking %s (DCS native parachute)",
+        crate.crateName)
+    timer.scheduleFunction(poll, {}, timer.getTime() + POLL_INTERVAL)
 end
 
 --- Auto-unpack a set of parachuted crates when all required crates have landed.
@@ -13772,7 +13925,7 @@ function CTLDCrateManager:refreshCrateFlightSection(playerObj, overrideInAir)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("Drop Crate(s)") },      not inAir)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("Unpack Crate") },       not inAir)
     menu:setBranchEnabled({ root, cratesSub, ctld.tr("List Nearby Crates") }, not inAir)
-    self:refreshPackEquiptSection(playerObj, inAir)
+    self:refreshPackEquiptSection(playerObj, inAir, true)  -- _noRefresh: final refresh() below covers it
 
     -- Parachute Crates: enabled only in air + CTLD crates loaded
     if caps.canParachuteDrop then
@@ -13881,7 +14034,7 @@ function CTLDCrateManager:buildMenuSection(playerObj, menu)
 
     local unpackSub = ctld.tr("Unpack Crate")
     menu:addSubMenu({ root, cratesSub }, unpackSub, { order = 20 })
-    self:refreshUnpackSection(playerObj)
+    self:refreshUnpackSection(playerObj, true)  -- _noRefresh: buildMenu calls refresh() at end
 
     menu:addCommand({ root, cratesSub }, ctld.tr("List Nearby Crates"),
         function(arg)
@@ -13926,7 +14079,7 @@ function CTLDCrateManager:buildMenuSection(playerObj, menu)
         end,
         { unitName = playerObj.unitName })
 
-    self:refreshPackEquiptSection(playerObj)
+    self:refreshPackEquiptSection(playerObj, nil, true)  -- _noRefresh: buildMenu calls refresh() at end
 
     -- Parachute Crates: added when cap allows; visibility managed by refreshCrateFlightSection.
     if caps.canParachuteDrop then
@@ -20961,7 +21114,7 @@ function CTLDPlayerManager:init()
                                 CTLDTroopManager.getInstance():refreshMenuSection(playerObj)
                                 CTLDCrateManager.getInstance():refreshRequestEquipmentSection(playerObj)
                                 CTLDCrateManager.getInstance():refreshLoadCrateSection(playerObj)
-                                CTLDCrateManager.getInstance():refreshUnpackSection(playerObj)
+                                CTLDCrateManager.getInstance():refreshUnpackSection(playerObj, true)  -- _noRefresh: refreshCrateFlightSection below calls refresh()
                                 CTLDCrateManager.getInstance():refreshCrateFlightSection(playerObj, false)
                                 CTLDVehicleSpawner.getInstance():refreshLoadSection(playerObj)
                                 CTLDVehicleSpawner.getInstance():refreshUnloadSection(playerObj)
@@ -21109,7 +21262,7 @@ function CTLDPlayerManager:onLand(event)
         CTLDTroopManager.getInstance():refreshMenuSection(captured)
         CTLDCrateManager.getInstance():refreshRequestEquipmentSection(captured)
         CTLDCrateManager.getInstance():refreshLoadCrateSection(captured)
-        CTLDCrateManager.getInstance():refreshUnpackSection(captured)
+        CTLDCrateManager.getInstance():refreshUnpackSection(captured, true)  -- _noRefresh: refreshCrateFlightSection below calls refresh()
         -- Pass overrideInAir=false: S_EVENT_LAND fires before inAir() crosses its threshold;
         -- force ground state immediately rather than relying on the speed/AGL check.
         CTLDCrateManager.getInstance():refreshCrateFlightSection(captured, false)
@@ -21309,7 +21462,7 @@ end
 function CTLDPlayerManager:refreshForUnit(unitName)
     local playerObj = self._players[unitName]
     if not playerObj then return end
-    ctld.MenuManager:getInstance():refreshMenuForGroup(playerObj.groupId)
+    ctld.MenuManager:getInstance():deferredRefreshForGroup(playerObj.groupId)
 end
 
 --- Refresh F10 menus for all currently tracked players.
@@ -22392,7 +22545,6 @@ countrysideFarpScene.crate = {
     groundKey      = "You must be on the ground to deploy a FARP.",
     cratesRequired = 3,
     side           = nil,
-    showSets       = false,
 }
 
 countrysideFarpScene.steps = {
@@ -22567,12 +22719,32 @@ countrysideFarpScene.steps = {
                     -- Invisible FARP airbases (DCS built-in) return nil for getWarehouse().
                     -- Only mod-based helipad FARPs have an accessible warehouse.
                     if w then
-                        -- If this is a redeployed FARP, restore the snapshot; otherwise zero the warehouse.
+                        -- If this is a redeployed FARP, restore the full snapshot; otherwise zero the warehouse.
                         local snap = ctx.scene._params.repackData
                                   and ctx.scene._params.repackData.warehouseSnapshot
-                        if snap and snap.liquid then
+                        if snap then
+                            -- Liquids
                             for fuelType = 0, 3 do
-                                w:setLiquidAmount(fuelType, snap.liquid[fuelType] or 0)
+                                w:setLiquidAmount(fuelType, snap.liquid and snap.liquid[fuelType] or 0)
+                            end
+                            -- Weapons: clear current, then set snapshot values
+                            local cur = w:getInventory()
+                            for typeName in pairs(cur and cur.weapon or {}) do
+                                if not (snap.weapon and snap.weapon[typeName]) then
+                                    w:setItem(typeName, 0)
+                                end
+                            end
+                            for typeName, count in pairs(snap.weapon or {}) do
+                                w:setItem(typeName, count)
+                            end
+                            -- Aircraft: clear current, then set snapshot values
+                            for typeName in pairs(cur and cur.aircraft or {}) do
+                                if not (snap.aircraft and snap.aircraft[typeName]) then
+                                    w:setItem(typeName, 0)
+                                end
+                            end
+                            for typeName, count in pairs(snap.aircraft or {}) do
+                                w:setItem(typeName, count)
                             end
                         else
                             w:setLiquidAmount(0, 0)   -- jet fuel
@@ -22732,13 +22904,16 @@ countrysideFarpScene.onRepack = function(scene, repackData)
     if not ab then return end
     local w = ab:getWarehouse()
     if not w then return end   -- Invisible FARP has no warehouse
+    local inv = w:getInventory()
     repackData.warehouseSnapshot = {
         liquid = {
             [0] = w:getLiquidAmount(0),   -- jet fuel
             [1] = w:getLiquidAmount(1),   -- aviation gasoline
             [2] = w:getLiquidAmount(2),   -- MW50
             [3] = w:getLiquidAmount(3),   -- diesel
-        }
+        },
+        weapon   = inv and inv.weapon   or {},
+        aircraft = inv and inv.aircraft or {},
     }
 end
 
