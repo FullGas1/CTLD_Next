@@ -363,19 +363,19 @@ end
 --------------------------------------------------------------------------------------------------------
 --- @function ctld.utils:rotateVec3
 -- Calcule l'offset cartésien absolu en appliquant la rotation du cap de l'appareil.
--- (Conçu pour le format de données : relative = {x, y, z})
+-- (Designed for the data format: relative = {x, y, z})
 function ctld.utils.rotateVec3(relativeVec, headingDeg)
     local x_rel = relativeVec.x
     local z_rel = relativeVec.z
     -- y_rel n'est pas utilisé dans le calcul de rotation, mais sera dans le retour
     local y_rel = relativeVec.y or 0
 
-    -- Vérification des données (X et Z sont obligatoires)
+    -- Input validation (X and Z are mandatory)
     if x_rel == nil or z_rel == nil then
         local msg = "CTLD.utils:rotateVec3: Missing X or Z component in relative position data."
         if env and env.error then
             env.error(msg)
-            -- Lève une erreur qui sera capturée par pcall (si appelé)
+            -- Raises an error to be caught by pcall (if called within one)
             error(msg)
         else
             error(msg)
@@ -720,9 +720,9 @@ function ctld.utils.tostringMGRS(caller, MGRS, acc)
 end
 
 --------------------------------------------------------------------------------------------------------
-ctld.utils.UniqIdCounter = 0 -- Compteur statique pour les ID uniques
+ctld.utils.UniqIdCounter = 0 -- Static counter for unique IDs
 --- @function ctld.utils:getNextUniqId
--- Génère un ID unique incrémental, comme requis pour 'unitId' dans groupData.
+-- Generates an incremental unique ID, as required for 'unitId' in groupData.
 function ctld.utils.getNextUniqId()
     ctld.utils.UniqIdCounter = ctld.utils.UniqIdCounter + 1
     return ctld.utils.UniqIdCounter
@@ -777,8 +777,8 @@ end
 
 --------------------------------------------------------------------------------------------------------
 --- @function ctld.utils:polarToCartesian
--- Convertit une distance (rho), un angle (theta) et un cap de référence (headingDeg)
--- en coordonnées cartésiennes absolues (x, z) de la carte DCS.
+-- Converts a distance (rho), an angle (theta) and a reference heading (headingDeg)
+-- into absolute Cartesian coordinates (x, z) on the DCS map.
 -- @param distance number La distance au point de référence.
 -- @param relativeAngle number L'angle relatif au point de référence (0 = devant, 90 = droite).
 -- @param headingDeg number Le cap absolu de l'appareil (point de référence).
@@ -787,14 +787,14 @@ function ctld.utils.polarToCartesian(distance, relativeAngle, headingDeg)
     local absoluteAngle = headingDeg + relativeAngle
     local angleRad = math.rad(absoluteAngle)
 
-    -- Correction du facteur distance (20m -> 10m)
+    -- Distance factor correction (20 m -> 10 m)
     local dist = (distance or 0) * 2
 
     -- X (Nord/Sud, l'axe de référence du cap 0°) : Utilise COS
     local x_rot = dist * math.cos(angleRad)
 
-    -- Z (Est/Ouest) : Utilise SIN. La trigonométrie standard sin(angle) augmente CCW.
-    -- Nous ne touchons pas au signe car la trigonométrie de DCS peut être non standard.
+    -- Z (East/West): uses SIN. Standard trig sin(angle) increases CCW.
+    -- Sign is kept as-is; DCS trigonometry convention may differ from standard.
     local z_rot = dist * math.sin(angleRad)
 
     return { x = x_rot, y = 0, z = z_rot }
@@ -1007,8 +1007,8 @@ function ctld.utils.getGroupRoute(caller, groupName, task)
     -- refactor to search by groupId and allow groupId and groupName as inputs
     local gpId = groupName
     --if mist.DBs.MEgroupsByName[groupName] then
-    if Group.getByName[groupName] then
-        gpId = Group.getByName[groupName]:getID()
+    if Group.getByName(groupName) then
+        gpId = Group.getByName(groupName):getID()
     else
         ctld.logError("ctld.utils.getGroupRoute()." .. tostring(caller) .. "'%s' not found in mist.DBs.MEgroupsByName",
             groupName)

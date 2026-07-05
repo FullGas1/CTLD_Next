@@ -3,7 +3,7 @@
 -- Minefield scene model — migrated from source_scene_ini/mineFieldSceneDatas.lua.
 --
 -- ====================================================================================================
--- BLOC 1 : i18n — 4 langues obligatoires
+-- BLOCK 1 : i18n -- 4 mandatory languages
 -- ====================================================================================================
 
 ctld.i18n["en"]["Mine Field Crate"]                        = "Mine Field Crate"
@@ -52,7 +52,7 @@ ctld.i18n["ko"]["Mine Field cleared by %1."]               = "%1이(가) 지뢰�
 -- ====================================================================================================
 
 -- ====================================================================================================
--- BLOC 2 : entrées ObjectRegistry requises par cette scène
+-- BLOCK 2 : ObjectRegistry entries required by this scene
 -- ====================================================================================================
 
 CTLDObjectRegistry.registerIfAbsent("Landmine", {
@@ -63,7 +63,7 @@ CTLDObjectRegistry.registerIfAbsent("Landmine", {
 })
 
 -- ====================================================================================================
--- BLOC 3 : définition de la scène + attributs crate
+-- BLOCK 3 : scene definition + crate attributes
 -- ====================================================================================================
 
 local mineFieldScene = {}
@@ -74,7 +74,7 @@ mineFieldScene.name  = "mineField"
 -- Populated by setLandMine; consumed by clearSet + refreshDemineSection.
 mineFieldScene._sets = {}
 
--- Attributs crate — auto-injectés dans CTLDCrateManager._weightIndex par _processSpawnableCrates().
+-- Crate attributes -- auto-injected into CTLDCrateManager._weightIndex by _processSpawnableCrates().
 mineFieldScene.crate = {
     weight         = 1001.25,
     i18nKey        = "Mine Field Crate",
@@ -457,7 +457,7 @@ function mineFieldScene:buildDemineSection(playerObj, menu)
 end
 
 -- ====================================================================================================
--- BLOC 4 : self-registration (toujours en dernier)
+-- BLOCK 4 : self-registration (always last)
 -- ====================================================================================================
 
 CTLDSceneManager.getInstance():registerSceneModel(mineFieldScene)

@@ -3,7 +3,7 @@
 -- CTLD_fobScene.lua
 --
 -- ============================================================
--- BLOC 1 : i18n — 4 langues obligatoires
+-- BLOCK 1 : i18n -- 4 mandatory languages
 -- ============================================================
 
 ctld.i18n["en"]["FOB Crate"]                                              = "FOB Crate"
@@ -85,7 +85,7 @@ ctld.i18n["ko"]["FOB established by %1 - logistics hub now active."]      = "%1�
 -- ============================================================
 
 -- ============================================================
--- BLOC 2 : entrées ObjectRegistry requises par cette scène
+-- BLOCK 2 : ObjectRegistry entries required by this scene
 -- ============================================================
 
 CTLDObjectRegistry.registerIfAbsent("FOB_container", {
@@ -106,15 +106,15 @@ CTLDObjectRegistry.registerIfAbsent("FOB_watchtower", {
 })
 
 -- ============================================================
--- BLOC 3 : définition de la scène + attributs crate
+-- BLOCK 3 : scene definition + crate attributes
 -- ============================================================
 
 local fobScene = {}
 fobScene.name = "FOB"
 
--- Attributs crate — auto-injectés dans CTLDCrateManager._weightIndex.
+-- Crate attributes -- auto-injected into CTLDCrateManager._weightIndex.
 -- L'action unpack délègue à CTLDFOBManager:unpackFOBCrates() qui gère les
--- gardes (zone logistique, distance, nombre de caisses) et la callback onComplete.
+-- guards (logistic zone, distance, crate count) and the onComplete callback.
 fobScene.crate = {
     weight         = 1001.22,
     i18nKey        = "FOB Crate",
@@ -126,7 +126,7 @@ fobScene.crate = {
     -- CTLDFOBManager._collectFOBCrates() collects any crate whose scene model
     -- has fobCompatible=true, so future FOB variants are recognised automatically.
     fobCompatible  = true,
-    -- Unpack custom : délègue intégralement à CTLDFOBManager (gardes + consommation crates + playScene).
+    -- Custom unpack: fully delegates to CTLDFOBManager (guards + crate consumption + playScene).
     -- sceneName identifies this specific FOB variant so multi-FOB missions work correctly.
     unpack = function(unit, unitName, sceneName)
         CTLDFOBManager.getInstance():unpackFOBCrates(unit, unitName, sceneName)
@@ -421,7 +421,7 @@ fobScene.steps = {
 }
 
 -- ============================================================
--- BLOC 4 : self-registration (toujours en dernier)
+-- BLOCK 4 : self-registration (always last)
 -- ============================================================
 
 CTLDSceneManager.getInstance():registerSceneModel(fobScene)

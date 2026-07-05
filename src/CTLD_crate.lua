@@ -70,9 +70,6 @@ function CTLDCrate:init(data)
     self.modelKey     = data.modelKey  or "load"
     self.canBeUnpacked = true
     -- Feature A: virtual parachute
-    self.isParachuting          = false
-    self.parachuteStartAltitude = nil
-    self.estimatedLandingTime   = nil
     self.fromParachute          = false   -- true → eligible for autoUnpack on landing
     self.loadedByDCSNative      = false   -- true → loaded via DCS standard UI (not CTLD menu); excluded from parachute
     -- Feature B: virtual slingload
@@ -114,8 +111,6 @@ end
 -- @param altitude number  current altitude AGL (metres)
 function CTLDCrate:startParachute(altitude)
     self.state                   = CTLDCrate.STATE.FALLING
-    self.isParachuting           = true
-    self.parachuteStartAltitude  = altitude
 end
 
 --- Crate touches the ground (after falling or parachuting).
@@ -123,7 +118,6 @@ end
 function CTLDCrate:land(position)
     self.state         = CTLDCrate.STATE.LANDED
     self.position      = position
-    self.isParachuting = false
 end
 
 --- Mark crate as unpacked (contents deployed).
@@ -1026,7 +1020,7 @@ function CTLDCrateManager:getLoadedCrateWeight(unitName)
     local total = 0
     for _, crate in pairs(self.crates) do
         if crate:isLoadedByCTLD()
-           and crate.loadedBy and crate.loadedBy:getName() == unitName then
+           and crate.loadedBy and crate.loadedBy:isExist() and crate.loadedBy:getName() == unitName then
             total = total + (crate.descriptor and crate.descriptor.weight or 0)
         end
     end
@@ -1304,7 +1298,10 @@ function CTLDCrateManager:_checkNativeDCSCargo()
                             local _transport  = entry.transport
                             local _unitName   = entry.unitName
                             local _groupId    = entry.playerObj.groupId
-                            pcall(function() _transport:UnloadCargo(_origStatic) end)
+                            local _okUL, _errUL = pcall(function() _transport:UnloadCargo(_origStatic) end)
+                            if not _okUL then
+                                ctld.utils.log("WARN", "CTLDCrateManager: UnloadCargo failed: %s", tostring(_errUL))
+                            end
                             timer.scheduleFunction(function()
                                 self:loadCrate(_crateName, _transport)
                                 local _c = self.crates[_crateName]
@@ -2326,7 +2323,6 @@ function CTLDCrateManager:parachuteCrates(transport, playerObj)
         end
         local landPos, descentTime = ctld.utils.calcDropPosition(transport, descentRate)
         crate:startParachute(altAGL)
-        crate.estimatedLandingTime = timer.getAbsTime() + descentTime
 
         local dropData = {
             type          = "crate",
@@ -2808,7 +2804,7 @@ function CTLDCrateManager:refreshCrateFlightSection(playerObj, overrideInAir)
                 if c:isLoadedByCTLD()
                         and not c.inTransitOnSlingload
                         and c.loadedBy
-                        and c.loadedBy:getName() == playerObj.unitName then
+                        and c.loadedBy:isExist() and c.loadedBy:getName() == playerObj.unitName then
                     onboard = onboard + 1
                 end
             end
@@ -2872,7 +2868,7 @@ function CTLDCrateManager:buildMenuSection(playerObj, menu)
             local mgr     = CTLDCrateManager.getInstance()
             local loaded  = {}
             for _, c in pairs(mgr.crates) do
-                if c:isLoadedByCTLD() and c.loadedBy and c.loadedBy:getName() == t:getName() then
+                if c:isLoadedByCTLD() and c.loadedBy and c.loadedBy:isExist() and c.loadedBy:getName() == t:getName() then
                     table.insert(loaded, c)
                 end
             end

@@ -28,7 +28,7 @@
 -- ====================================================================================================
 
 -- ====================================================================================================
--- BLOC 1 : i18n — 4 langues obligatoires
+-- BLOCK 1 : i18n -- 4 mandatory languages
 -- ====================================================================================================
 
 ctld.i18n["en"]["FARP Alpha Crate"]                                  = "FARP Alpha Crate"
@@ -47,7 +47,7 @@ ctld.i18n["es"]["--- FARP Dynamic Deployment by %1 : Complete! ---"] = "--- Desp
 ctld.i18n["ko"]["--- FARP Dynamic Deployment by %1 : Complete! ---"] = "--- %1에 의한 FARP 동적 배치 완료! ---"
 
 -- ====================================================================================================
--- BLOC 2 : entrées ObjectRegistry requises par cette scène (registerIfAbsent = no-op si déjà présente)
+-- BLOCK 2 : ObjectRegistry entries required by this scene (registerIfAbsent = no-op si déjà présente)
 -- ====================================================================================================
 
 CTLDObjectRegistry.registerIfAbsent("SINGLE_HELIPAD", {
@@ -198,13 +198,13 @@ CTLDObjectRegistry.registerIfAbsent("Windsock", {
 })
 
 -- ====================================================================================================
--- BLOC 3 : définition de la scène + attributs crate
+-- BLOCK 3 : scene definition + crate attributes
 -- ====================================================================================================
 
 local farpAlphaScene = {
     name = "FARP Alpha",
 
-    -- Attributs crate — auto-injectés dans CTLDCrateManager._weightIndex par _processSpawnableCrates().
+    -- Crate attributes -- auto-injected into CTLDCrateManager._weightIndex by _processSpawnableCrates().
     crate = {
         weight         = 1001.23,
         i18nKey        = "FARP Alpha Crate",
@@ -359,7 +359,7 @@ local farpAlphaScene = {
 }
 
 -- ====================================================================================================
--- BLOC 4 : self-registration (toujours en dernier)
+-- BLOCK 4 : self-registration (always last)
 -- ====================================================================================================
 
 CTLDSceneManager.getInstance():registerSceneModel(farpAlphaScene)

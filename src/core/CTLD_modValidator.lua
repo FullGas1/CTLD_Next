@@ -262,7 +262,9 @@ function CTLDModValidator:_probeGround(typeName)
             local okT, actual = pcall(function() return units[1]:getTypeName() end)
             valid = okT and (actual == typeName)
         end
-        pcall(function() grp:destroy() end)
+        local _okD1 = pcall(function() grp:destroy() end)
+
+        if not _okD1 then ctld.utils.log("WARN", "ModValidator: failed to destroy test group") end
     end
 
     self._cache[cacheKey] = valid
@@ -297,7 +299,9 @@ function CTLDModValidator:_probeStatic(typeName, category, extras)
     local ok, obj = pcall(coalition.addStaticObject, country.id.USA, staticData)
     local valid = ok and (obj ~= nil)
     if ok and obj then
-        pcall(function() obj:destroy() end)
+        local _okD2 = pcall(function() obj:destroy() end)
+
+        if not _okD2 then ctld.utils.log("WARN", "ModValidator: failed to destroy test static object") end
     end
 
     self._cache[cacheKey] = valid
@@ -340,7 +344,10 @@ function CTLDModValidator:_probeHeliport(typeName, category, extras)
             valid = okD and type(d) == "table" and (d.life or 0) > 0
         end
         local ab = Airbase.getByName(name)
-        if ab then pcall(function() ab:destroy() end) end
+        if ab then
+            local _okD3 = pcall(function() ab:destroy() end)
+            if not _okD3 then ctld.utils.log("WARN", "ModValidator: failed to destroy test airbase") end
+        end
     end
 
     self._cache[cacheKey] = valid

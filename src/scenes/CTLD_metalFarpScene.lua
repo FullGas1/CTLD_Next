@@ -21,7 +21,7 @@
 -- ====================================================================================================
 
 -- ====================================================================================================
--- BLOC 1 : i18n — 4 langues obligatoires
+-- BLOCK 1 : i18n -- 4 mandatory languages
 -- ====================================================================================================
 
 ctld.i18n["en"]["Metal FARP Crate"]                                        = "Metal FARP Crate"
@@ -40,7 +40,7 @@ ctld.i18n["es"]["--- Metal FARP Deployment by %1 : Complete! ---"]        = "---
 ctld.i18n["ko"]["--- Metal FARP Deployment by %1 : Complete! ---"]        = "--- %1에 의한 메탈 FARP 배치 완료! ---"
 
 -- ====================================================================================================
--- BLOC 2 : Registry entries required by this scene.
+-- BLOCK 2 : Registry entries required by this scene.
 -- registerIfAbsent() is a no-op when the key already exists.
 -- ====================================================================================================
 
@@ -129,7 +129,7 @@ CTLDObjectRegistry.registerIfAbsent("Windsock", {
 -- "us carrier shooter" is already registered in the global CTLDObjectRegistry default entries.
 
 -- ====================================================================================================
--- BLOC 3 : scene model + crate descriptor
+-- BLOCK 3 : scene model + crate descriptor
 -- ====================================================================================================
 
 local metalFarpScene = {}
@@ -277,7 +277,7 @@ metalFarpScene.steps = {
 }
 
 -- ====================================================================================================
--- BLOC 4 : onRepack — called by CTLDSceneManager:packScene before objects are destroyed.
+-- BLOCK 4 : onRepack — called by CTLDSceneManager:packScene before objects are destroyed.
 -- Captures the current warehouse fuel levels so they can be restored on next deployment.
 -- ====================================================================================================
 
@@ -298,7 +298,7 @@ metalFarpScene.onRepack = function(scene, repackData)
 end
 
 -- ====================================================================================================
--- BLOC 5 : self-registration
+-- BLOCK 5 : self-registration
 -- ====================================================================================================
 
 CTLDSceneManager.getInstance():registerSceneModel(metalFarpScene)

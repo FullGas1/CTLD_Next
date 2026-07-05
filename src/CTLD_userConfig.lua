@@ -171,6 +171,9 @@ ctld.yamlConfigDatas = [[
 # JTAC laser designator + radio + binoculars weight (kg).
 # ctld.JTAC_WEIGHT: 15
 
+# Civilian role personal items weight (kg).
+# ctld.CIV_WEIGHT: 2
+
 
 # ============================================================
 # FOB (Forward Operating Base)
@@ -194,6 +197,9 @@ ctld.yamlConfigDatas = [[
 
 # Radius (m) within which troops can board a transport at a FOB.
 # ctld.fobTroopPickupRadius: 150
+
+# Allow players to pack a deployed FARP back into crates for redeployment elsewhere.
+# ctld.enableFARPRepack: true
 
 
 # ============================================================
@@ -635,7 +641,7 @@ if _cfg.settings["debug"] == true then
         { dcsZoneName="AIZ_depot_B_P_T_10",    coalition="BLUE", isPickup=true,  cargoType="T",
           troopStock = { ["All"] = -1 } },
 
-        -- ── MT-11 : 2 troop templates avec stock limité ──────────────────
+        -- ── MT-11 : 2 troop templates with limited stock ──────────────────
         { dcsZoneName="AIZ_mt11_B_P_T",  coalition="BLUE", isPickup=true,  cargoType="T",
           troopStock = { ["Standard Group"] = 3, ["Anti Tank"] = 2 } },
         { dcsZoneName="AIZ_mt11_B_D",    coalition="BLUE", isDropoff=true, aiDropMode="GP" },

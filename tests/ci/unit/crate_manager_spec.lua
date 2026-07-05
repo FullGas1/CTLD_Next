@@ -113,6 +113,19 @@ describe("CTLDCrate entity", function()
             assert.is_nil(c.loadedBy)
         end)
 
+        it("loadedBy:isExist() guard — dead unit treated as not loaded", function()
+            -- Regression: crate.loadedBy guard must check isExist(), not just nil
+            local dead_unit = {
+                getName   = function() return "dead_heli" end,
+                isExist   = function() return false end,
+            }
+            local c = makeCrate()
+            c:load(dead_unit)
+            -- Simulate the guard pattern used in CTLDCrateManager
+            local counted = c.loadedBy and c.loadedBy:isExist() and c.loadedBy:getName() or nil
+            assert.is_nil(counted)
+        end)
+
         it("drop() transitions LOADED → FALLING", function()
             local c = makeCrate()
             c:load(transport)

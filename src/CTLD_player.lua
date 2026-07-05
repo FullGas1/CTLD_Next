@@ -357,7 +357,9 @@ function CTLDPlayerManager:onPlayerLeaveUnit(event)
     local menuData = mmgr.menus and mmgr.menus[playerObj.groupId]
     if menuData then
         for _, item in ipairs(menuData.children or {}) do
-            missionCommands.removeItemForGroup(playerObj.groupId, { item.name })
+            if item._dcsHandle ~= nil then
+                missionCommands.removeItemForGroup(playerObj.groupId, item._dcsHandle)
+            end
         end
         mmgr.menus[playerObj.groupId] = nil
     end

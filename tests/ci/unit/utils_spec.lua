@@ -415,4 +415,44 @@ describe("ctld.utils", function()
 
     end)
 
+    -- ── getGroupId ───────────────────────────────────────────
+    describe("getGroupId", function()
+
+        it("returns -1 for nil unit", function()
+            assert.equals(-1, ctld.utils.getGroupId(nil))
+        end)
+
+        it("returns -1 when unit:getGroup() returns nil", function()
+            local unit = { getGroup = function() return nil end }
+            assert.equals(-1, ctld.utils.getGroupId(unit))
+        end)
+
+        it("returns group id when unit and group are valid", function()
+            local unit = { getGroup = function()
+                return { getID = function() return 42 end }
+            end }
+            assert.equals(42, ctld.utils.getGroupId(unit))
+        end)
+
+    end)
+
+    -- ── inAir ────────────────────────────────────────────────
+    describe("inAir", function()
+
+        it("returns false for nil unit", function()
+            assert.is_false(ctld.utils.inAir(nil))
+        end)
+
+        it("returns false when unit has no inAir method", function()
+            local unit = {}
+            assert.is_false(ctld.utils.inAir(unit))
+        end)
+
+        it("returns false when unit:inAir() returns false", function()
+            local unit = { inAir = function() return false end }
+            assert.is_false(ctld.utils.inAir(unit))
+        end)
+
+    end)
+
 end)

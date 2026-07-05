@@ -28,7 +28,7 @@
 local countrysideFarpScene = {}
 countrysideFarpScene.name  = "Countryside FARP"
 
--- Attributs crate — auto-injectés dans CTLDCrateManager._weightIndex par _processSpawnableCrates().
+-- Crate attributes -- auto-injected into CTLDCrateManager._weightIndex by _processSpawnableCrates().
 countrysideFarpScene.crate = {
     weight         = 1001.24,
     i18nKey        = "Countryside FARP Crate",
@@ -254,7 +254,7 @@ countrysideFarpScene.steps = {
 }
 
 -- ====================================================================================================
--- BLOC 1 : i18n — 4 langues obligatoires
+-- BLOCK 1 : i18n -- 4 mandatory languages
 -- ====================================================================================================
 
 ctld.i18n["en"]["Countryside FARP Crate"]                                        = "Countryside FARP Crate"
@@ -273,7 +273,7 @@ ctld.i18n["es"]["--- Countryside FARP Deployment by %1 : Complete! ---"]        
 ctld.i18n["ko"]["--- Countryside FARP Deployment by %1 : Complete! ---"]         = "--- %1에 의한 야외 FARP 배치 완료! ---"
 
 -- ====================================================================================================
--- BLOC 2 : Registry entries required by this scene.
+-- BLOCK 2 : Registry entries required by this scene.
 -- registerIfAbsent() is a no-op when the key already exists, so multiple scenes
 -- can safely declare the same shared entry (FARP, Fuel_Truck, etc.) without conflict.
 -- ====================================================================================================
@@ -384,7 +384,7 @@ CTLDObjectRegistry.registerIfAbsent("Windsock", {
 })
 
 -- ====================================================================================================
--- BLOC : onRepack — called by CTLDSceneManager:packScene before objects are destroyed.
+-- BLOCK : onRepack — called by CTLDSceneManager:packScene before objects are destroyed.
 -- Captures the current warehouse fuel levels so they can be restored on next deployment.
 -- ====================================================================================================
 

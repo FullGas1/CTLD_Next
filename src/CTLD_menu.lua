@@ -245,7 +245,7 @@ end
 -- Coalition iteration is the only reliable way to resolve groupId → name.
 function ctld.MenuManager:_getGroupName(groupId)
     for _, coalId in ipairs({ 0, 1, 2 }) do
-        for _, gp in pairs(coalition.getGroups(coalId)) do
+        for _, gp in pairs(coalition.getGroups(coalId) or {}) do
             if gp:getID() == groupId then return gp:getName() end
         end
     end

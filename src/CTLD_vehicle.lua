@@ -1522,7 +1522,7 @@ function CTLDVehicleSpawner:refreshUnloadSection(playerObj)
     menu:clearBranch({ root, vehSub, unloadSub })
 
     local transport = Unit.getByName(playerObj.unitName)
-    local inAir     = not (transport and transport:isExist()) or ctld.utils.inAir(transport)
+    local inAir     = (transport and transport:isExist()) and ctld.utils.inAir(transport) or false
     local loaded    = (transport and transport:isExist()) and self:findLoadedVehicles(transport) or {}
 
     if #loaded == 0 then

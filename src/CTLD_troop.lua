@@ -93,7 +93,7 @@ function CTLDTroopGroup:_syncFromDCSGroup(dcsGroup)
         self.unitTotal = 0
         return
     end
-    local units = dcsGroup:getUnits()
+    local units = dcsGroup:getUnits() or {}
     for _, unit in ipairs(units) do
         if unit:isExist() then
             local name = unit:getName()

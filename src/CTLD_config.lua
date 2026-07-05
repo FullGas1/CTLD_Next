@@ -2,6 +2,8 @@
 -- src version — do not edit source/ original
 ctld = ctld or {}
 
+ctld.VERSION = "2.0.0"
+
 CTLDConfig = {}
 CTLDConfig._instance = nil
 
@@ -226,11 +228,14 @@ function CTLDConfig:load()
     self.settings["enablePackingVehicles"]              = true  -- if true, vehicles can be packed into crates
     self.settings["maximumDistancePackableUnitsSearch"] = 200   -- max distance from transportUnit to search for packable units in meters
     self.settings["groundVehicleWeights"]               = {
-        ["BRDM-2"] = 7000,
-        ["BTR_D"] = 8000,
-        ["M1045 HMMWV TOW"] = 3220,
-        ["M1043 HMMWV Armament"] = 2500,
-        ["Hummer"] = 2400,  -- M998 HMMWV unloaded ~2359 kg; rounded to 2400 (exceeds UH-1H limit of 1360 kg by design)
+        -- Weights (kg) used to check helicopter sling-load capacity against maxVehicleWeight.
+        -- Values are rounded real-world unloaded masses; combat loads intentionally excluded
+        -- so that mission makers can adjust maxVehicleWeight per helicopter for gameplay balance.
+        ["BRDM-2"]              = 7000,  -- real ~7500 kg; rounded down, only liftable by Mi-26/CH-47 class
+        ["BTR_D"]               = 8000,  -- real ~8200 kg; same category
+        ["M1045 HMMWV TOW"]     = 5000,  -- M1045A2 combat-ready with TOW launcher, crew, ammo ~4600-5000 kg; 5 crates required
+        ["M1043 HMMWV Armament"]= 2500,  -- M1043 with .50 cal ~2500 kg unloaded
+        ["Hummer"]              = 2400,  -- M998 HMMWV unloaded ~2359 kg; rounded to 2400 (exceeds UH-1H limit of 1360 kg by design)
     }
 
     -- ═══════════════════════════════════════════════════════════
@@ -680,20 +685,20 @@ function CTLDConfig:load()
             -- Some descriptions are filtered to determine if JTAC or not!
 
             --- BLUE
-            { weight = 1000.01, desc = ctld.tr("Humvee - MG"),         unit = "M1043 HMMWV Armament", side = 2 }, --careful with the names as the script matches the desc to JTAC types
-            { weight = 1000.02, desc = ctld.tr("Humvee - TOW"),        unit = "M1045 HMMWV TOW",      side = 2, cratesRequired = 2 },
+            { weight = 1000.01, desc = ctld.tr("Humvee - MG"),         unit = "M1043 HMMWV Armament", side = 2, cratesRequired = 3 }, --careful with the names as the script matches the desc to JTAC types
+            { weight = 1000.02, desc = ctld.tr("Humvee - TOW"),        unit = "M1045 HMMWV TOW",      side = 2, cratesRequired = 5 },
             { weight = 1000.03, desc = ctld.tr("Light Tank - MRAP"),   unit = "MaxxPro_MRAP",         side = 2, cratesRequired = 2 },
             { weight = 1000.04, desc = ctld.tr("Med Tank - LAV-25"),   unit = "LAV-25",               side = 2, cratesRequired = 3 },
             { weight = 1000.05, desc = ctld.tr("Heavy Tank - Abrams"), unit = "M-1 Abrams",           side = 2, cratesRequired = 4 },
 
             --- RED
-            { weight = 1000.11, desc = ctld.tr("BTR-D"),               unit = "BTR_D",                side = 1 },
-            { weight = 1000.12, desc = ctld.tr("BRDM-2"),              unit = "BRDM-2",               side = 1 },
+            { weight = 1000.11, desc = ctld.tr("BTR-D"),               unit = "BTR_D",                side = 1, cratesRequired = 8 },
+            { weight = 1000.12, desc = ctld.tr("BRDM-2"),              unit = "BRDM-2",               side = 1, cratesRequired = 7 },
             -- need more redfor!
         },
         ["Support"] = {
             --- BLUE
-            { weight = 1001.01, desc = ctld.tr("Hummer - JTAC"),       unit = "Hummer",            side = 2,          cratesRequired = 1, isJTAC = true }, -- hidden when JTAC_dropEnabled=false
+            { weight = 1001.01, desc = ctld.tr("Hummer - JTAC"),       unit = "Hummer",            side = 2,          cratesRequired = 2, isJTAC = true }, -- hidden when JTAC_dropEnabled=false
             { weight = 1001.02, desc = ctld.tr("M-818 Ammo Truck"),    unit = "M 818",             side = 2,          cratesRequired = 2 },
             { weight = 1001.03, desc = ctld.tr("M-978 Tanker"),        unit = "M978 HEMTT Tanker", side = 2,          cratesRequired = 2 },
 
