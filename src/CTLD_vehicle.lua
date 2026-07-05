@@ -714,18 +714,18 @@ function CTLDVehicleSpawner:_checkNativeLoading()
 
                         -- Check WAITING vehicles for bbox entry
                         for id, veh in pairs(waitingVehicles) do
-                            if not (veh.unit and veh.unit:isExist()) then goto continue_waiting end
-                            local uPos = veh.unit:getPoint()
-                            local lp   = self:_worldToLocal(uPos, transform)
-                            if self:_isInBbox(lp, box) then
-                                -- Vehicle entered bbox → load
-                                self:loadVehicle(veh, transport, nil, "dcs_native")
-                                -- Track transport for exit detection
-                                self._nativeTracked[tName] = self._nativeTracked[tName] or {}
-                                self._nativeTracked[tName][id] = true
-                                waitingVehicles[id] = nil  -- prevent double-fire
+                            if veh.unit and veh.unit:isExist() then
+                                local uPos = veh.unit:getPoint()
+                                local lp   = self:_worldToLocal(uPos, transform)
+                                if self:_isInBbox(lp, box) then
+                                    -- Vehicle entered bbox → load
+                                    self:loadVehicle(veh, transport, nil, "dcs_native")
+                                    -- Track transport for exit detection
+                                    self._nativeTracked[tName] = self._nativeTracked[tName] or {}
+                                    self._nativeTracked[tName][id] = true
+                                    waitingVehicles[id] = nil  -- prevent double-fire
+                                end
                             end
-                            ::continue_waiting::
                         end
 
                         -- Check LOADED (native) vehicles for bbox exit
