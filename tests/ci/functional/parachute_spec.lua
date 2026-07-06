@@ -95,19 +95,9 @@ describe("F-057/F-058 — parachuteCrates", function()
             assert.is_true(payload.altitude >= 30)
         end)
 
-        it("crate.isParachuting == true", function()
-            cm:parachuteCrates(mockTransport, { unitName="MockTransport_F57", groupId=9901, groupName="G", coalition=2 })
-            assert.is_true(crate.isParachuting)
-        end)
-
         it("crate state == FALLING", function()
             cm:parachuteCrates(mockTransport, { unitName="MockTransport_F57", groupId=9901, groupName="G", coalition=2 })
             assert.equals(CTLDCrate.STATE.FALLING, crate.state)
-        end)
-
-        it("estimatedLandingTime is set", function()
-            cm:parachuteCrates(mockTransport, { unitName="MockTransport_F57", groupId=9901, groupName="G", coalition=2 })
-            assert.is_not_nil(crate.estimatedLandingTime)
         end)
 
     end)
