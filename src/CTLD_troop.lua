@@ -744,7 +744,8 @@ function CTLDTroopManager:embarkFromTroopZone(unit, zone, template)
     ctld.utils.log("INFO", "embarkFromTroopZone: '%s' loaded '%s' (%d units, %.0f kg)",
         unitName, template.name, template.total, weight)
 
-    pcall(self._updateWeight, self, unitName)
+    local _wok, _werr = pcall(self._updateWeight, self, unitName)
+    if not _wok then ctld.utils.log("WARN", "CTLDTroopManager: _updateWeight failed for '%s': %s", unitName, tostring(_werr)) end
 
     local _pObj = CTLDPlayerManager.getInstance():getPlayer(unitName)
     if _pObj then self:refreshMenuSection(_pObj) end
@@ -877,7 +878,8 @@ function CTLDTroopManager:disembark(unit)
 
     table.remove(list, 1)
     if #list == 0 then self._inTransit[unitName] = nil end
-    pcall(self._updateWeight, self, unitName)
+    local _wok, _werr = pcall(self._updateWeight, self, unitName)
+    if not _wok then ctld.utils.log("WARN", "CTLDTroopManager: _updateWeight failed for '%s': %s", unitName, tostring(_werr)) end
 
     local _pObj = CTLDPlayerManager.getInstance():getPlayer(unitName)
     if _pObj then self:refreshMenuSection(_pObj) end
@@ -958,7 +960,8 @@ function CTLDTroopManager:returnToTroopZone(unit, zone)
     end
 
     self._inTransit[unitName] = nil
-    pcall(self._updateWeight, self, unitName)
+    local _wok, _werr = pcall(self._updateWeight, self, unitName)
+    if not _wok then ctld.utils.log("WARN", "CTLDTroopManager: _updateWeight failed for '%s': %s", unitName, tostring(_werr)) end
 
     local _pObj = CTLDPlayerManager.getInstance():getPlayer(unitName)
     if _pObj then self:refreshMenuSection(_pObj) end
@@ -1055,7 +1058,8 @@ function CTLDTroopManager:embarkFromField(unit)
     self:_removeFromDropped(coalition, nearest.groupName)
     nearest.group:destroy()
 
-    pcall(self._updateWeight, self, unitName)
+    local _wok, _werr = pcall(self._updateWeight, self, unitName)
+    if not _wok then ctld.utils.log("WARN", "CTLDTroopManager: _updateWeight failed for '%s': %s", unitName, tostring(_werr)) end
 
     local _pObj = CTLDPlayerManager.getInstance():getPlayer(unitName)
     if _pObj then self:refreshMenuSection(_pObj) end

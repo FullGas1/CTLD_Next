@@ -246,7 +246,8 @@ function CTLDSmokeManager:_tick()
             for _, entry in ipairs(list) do
                 if now - entry.launchTime >= interval then
                     -- Re-trigger and reset the timer
-                    pcall(trigger.action.smoke, entry.pos, entry.color)
+                    local _sok, _serr = pcall(trigger.action.smoke, entry.pos, entry.color)
+                    if not _sok then ctld.utils.log("WARN", "CTLDSmokeManager: smoke trigger failed for '%s': %s", playerName, tostring(_serr)) end
                     ctld.utils.log("INFO", "CTLDSmokeManager: auto-resume smoke for '%s'", playerName)
                     newList[#newList + 1] = { pos = entry.pos, color = entry.color, launchTime = now }
                 else

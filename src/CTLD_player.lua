@@ -243,7 +243,8 @@ function CTLDPlayerManager:init()
                                 CTLDJTACManager.getInstance():refreshJtacEquipmentSection(playerObj)
                                 for _, s in ipairs(inst._menuSections) do
                                     if s.refreshMethod and s.manager and s.manager[s.refreshMethod] then
-                                        pcall(s.manager[s.refreshMethod], s.manager, playerObj)
+                                        local _rok, _rerr = pcall(s.manager[s.refreshMethod], s.manager, playerObj)
+                                        if not _rok then ctld.utils.log("WARN", "CTLDPlayerManager: refreshSection '%s' failed for '%s': %s", tostring(s.refreshMethod), unitName, tostring(_rerr)) end
                                     end
                                 end
                                 ctld.utils.log("INFO", "CTLDPlayerManager: flight-state poller → LAND unit=%s", unitName)
