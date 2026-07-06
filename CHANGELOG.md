@@ -38,6 +38,11 @@ Backward compatible with missions using the v1 scripting API via the legacy comp
   Metal FARP, FOB, Minefield…). Polar and axis step types. Mission maker can define custom scenes.
 - **FARP Repack** — pack a deployed FARP back into crates; warehouse fuel snapshot preserved
   and restored at next unpack. Controlled by `enableFARPRepack`.
+- **Mod Validation Guard** — `CTLDModValidator` probes all DCS type names declared in config at
+  mission start. Scenes that depend on missing mod types are automatically disabled with a WARN
+  outText. `step.critical = true` on a scene step aborts the scene if the spawn returns nil.
+  `requiresMod` scene field triggers a WARN for mod types that cannot be auto-validated
+  (heliport-type objects: DCS returns identical API values whether the mod is installed or not).
 - **AI Zone config** (Feature S) — `cfg.settings["aiZones"]` table replaces brittle naming
   convention. Full control of pickup/dropoff zones, troop/vehicle stock, templates, drop mode.
 - **AI Zone stock per template/type** (Feature T) — `troopStock`/`vehicleStock` per template
