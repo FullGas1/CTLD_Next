@@ -1098,6 +1098,35 @@ CTLDModValidator.getInstance():isPresent("AAA_HAWK_SR")  -- → bool (cached aft
 
 Results are cached in `_cache[typeName]`. The probe is deferred to first use so mission load time is not impacted.
 
+#### probeSkip — heliport-type objects cannot be probed
+
+The probe technique works for STATIC and GROUND objects. It does **not** work for objects registered with `category = "Heliports"` (i.e. spawned via the airbase API rather than the static object API).
+
+**Root cause (verified by live DCS diagnostic):** when a heliport-type static is spawned via `coalition.addStaticObject`, DCS registers it as an `Airbase` entry regardless of whether the mod is installed. All API fields — `ab:getTypeName()`, `ab:getCategory()`, `ab:getCategoryEx()`, `ab:getCallsign()`, `ab:getDesc().life`, `ab:getDesc().displayName` — return identical values whether the mod is present or absent. There is no signal in the Lua scripting API to distinguish the two states.
+
+**Consequence:** if a heliport registry entry does not set `probeSkip = true`, `CTLDModValidator` will always report it as present, producing a false-positive "mod found" result even when the mod is missing.
+
+**Rule:** any registry entry with `category = "Heliports"` **must** set `probeSkip = true`.
+
+```lua
+CTLDObjectRegistry.registerIfAbsent("Farp_FG_Petit_Helipad", {
+    groupType          = "STATIC",
+    category           = "Heliports",
+    -- probeSkip suppresses the ModValidator probe: DCS returns life=0 and identical
+    -- API data regardless of mod installation state — no reliable detection is possible.
+    probeSkip          = true,
+    ...
+})
+```
+
+**Mitigation for scenes using heliport mods:** declare `requiresMod` on the scene model. `CTLDSceneManager:_auditAfterModValidator()` will emit a WARN `outText` at mission start to remind the mission maker that all clients must have the mod installed:
+
+```lua
+metalFarpScene.requiresMod = "Farp_FG_Petit_Helipad"
+```
+
+This WARN is the only mechanism available. Automatic menu suppression is not possible for heliport-type mods.
+
 ### 19.4 CTLD_utils.lua — utility functions
 
 Key functions available as `ctld.utils.*`:
