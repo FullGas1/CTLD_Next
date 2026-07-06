@@ -1,7 +1,7 @@
 # DCS-CTLD Modernization Plan
 
 > **This is the single source of truth for all ongoing work.**
-> Status: **In Progress** | Branch: `feature_modularisation_and_Config` → target `master` | Target: CTLD v2.0
+> Status: **✅ PUBLISHED** | PR dev→master ouvert [2026-07-06] | Version: CTLD v2.0.0
 
 ---
 
